@@ -1,7 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using RWCustom;
+using System;
 using System.Linq;
-using System.Text;
+using UnityEngine;
 
 namespace GameruleSet
 {
@@ -12,24 +12,61 @@ namespace GameruleSet
         public Injury(Rules rules)
         {
             this.rules = rules;
-        }
 
-        internal void Initialize()
-        {
-            On.ProcessManager.SwitchMainProcess += ProcessManager_SwitchMainProcess;
+            On.ProcessManager.SwitchMainProcess += (o, s, i) =>
+            {
+                if (s.currentMainLoop is RainWorldGame game)
+                    ResetInjury(game);
+                o(s, i);
+            };
+            On.ArenaGameSession.EndSession += (o, s) =>
+            {
+                ResetInjury(s.game);
+                o(s);
+            };
+            On.Creature.Grab += Creature_Grab;
             On.Creature.Violence += Creature_Violence;
-            On.Player.Update += Player_Update;
             On.Creature.SpearStick += Creature_SpearStick;
+            On.Player.Update += Player_Update;
         }
 
-        private void ProcessManager_SwitchMainProcess(On.ProcessManager.orig_SwitchMainProcess orig, ProcessManager self, ProcessManager.ProcessID ID)
+        private VultureMask? GetGraspedMask(Player player)
         {
-            if (self.currentMainLoop is RainWorldGame game)
-                for (int i = 0; i < game.session.Players.Count; i++)
+            foreach (var grasp in player.grasps)
+            {
+                if (grasp?.grabbed is VultureMask mask)
+                    return mask;
+            }
+            return null;
+        }
+
+        private bool Creature_Grab(On.Creature.orig_Grab orig, Creature self, PhysicalObject obj, int graspUsed, int chunkGrabbed, Creature.Grasp.Shareability shareability, float dominance, bool overrideEquallyDominant, bool pacifying)
+        {
+            if (rules.Injury.Value && obj is Player player)
+            {
+                if (rules.GetData(player.abstractCreature.ID).injuryCooldown > 0)
                 {
-                    rules.GetData(game.session.Players[i].ID).injured = false;
+                    return false;
                 }
-            orig(self, ID);
+                if (chunkGrabbed == 0)
+                {
+                    var mask = GetGraspedMask(player);
+                    if (mask != null)
+                    {
+                        mask.AllGraspsLetGoOfThisObject(true);
+                        obj = mask;
+                    }
+                }
+            }
+            return orig(self, obj, graspUsed, chunkGrabbed, shareability, dominance, overrideEquallyDominant, pacifying);
+        }
+
+        private void ResetInjury(RainWorldGame game)
+        {
+            for (int i = 0; i < game.session.Players.Count; i++)
+            {
+                rules.GetData(game.session.Players[i].ID).injured = false;
+            }
         }
 
         private void Player_Update(On.Player.orig_Update orig, Player self, bool eu)
@@ -54,28 +91,54 @@ namespace GameruleSet
                     self.bodyChunks[1].mass = 0.35f * self.slugcatStats.bodyWeightFac;
                 }
             }
+
+            if (data.damageBlockedWithMask > 0)
+            {
+                self.Stun((int)(data.damageBlockedWithMask * 15));
+                data.damageBlockedWithMask = 0;
+            }
+
             if (data.injured)
+            {
                 data.injuryCooldown--;
+            }
             else data.injuryCooldown = 0;
+
+            var mask = GetGraspedMask(self);
+            if (mask != null && self.graphicsModule is PlayerGraphics graphics && graphics.objectLooker.currentMostInteresting is Creature creature && !creature.dead)
+            {
+                CreatureTemplate.Relationship relationship = self.abstractCreature.creatureTemplate.CreatureRelationship(creature);
+                if (relationship.type == CreatureTemplate.Relationship.Type.Afraid || relationship.type == CreatureTemplate.Relationship.Type.Attacks)
+                {
+                    data.danger += creature.abstractCreature.abstractAI.RealAI.CurrentPlayerAggression(self.abstractCreature) / 20f;
+                    mask.donned = Mathf.Clamp(data.danger, mask.donned, 1);
+                }
+            }
+            else data.danger = 0;
         }
 
-        private bool Creature_SpearStick(On.Creature.orig_SpearStick orig, Creature self, Weapon source, float dmg, BodyChunk chunk, PhysicalObject.Appendage.Pos appPos, UnityEngine.Vector2 direction)
+        private bool Creature_SpearStick(On.Creature.orig_SpearStick orig, Creature self, Weapon source, float dmg, BodyChunk chunk, PhysicalObject.Appendage.Pos appPos, Vector2 direction)
         {
-            if (rules.Injury.Value && self is Player player && chunk.index == 0 && player.grasps.Any(g => g?.grabbed is VultureMask))
+            if (rules.Injury.Value && self is Player player && chunk.index == 0 && GetGraspedMask(player) != null)
+            {
                 return false;
+            }
+
             return orig(self, source, dmg, chunk, appPos, direction);
         }
 
-        private void Creature_Violence(On.Creature.orig_Violence orig, Creature self, BodyChunk source, UnityEngine.Vector2? directionAndMomentum, BodyChunk hitChunk, PhysicalObject.Appendage.Pos hitAppendage, Creature.DamageType type, float damage, float stunBonus)
+        private void Creature_Violence(On.Creature.orig_Violence orig, Creature self, BodyChunk source, Vector2? directionAndMomentum, BodyChunk hitChunk, PhysicalObject.Appendage.Pos hitAppendage, Creature.DamageType type, float damage, float stunBonus)
         {
             if (rules.Injury.Value && self is Player player && damage >= self.Template.instantDeathDamageLimit)
             {
-                var data = this.rules.GetData(player.abstractCreature.ID);
+                var data = rules.GetData(player.abstractCreature.ID);
                 if (hitChunk.index == 0 && type != Creature.DamageType.Electric && type != Creature.DamageType.Explosion)
                 {
-                    var grasp = player.grasps.FirstOrDefault(g => g?.grabbed is VultureMask);
-                    if (grasp?.grabbed is VultureMask mask)
+                    var mask = GetGraspedMask(player);
+                    if (mask != null)
                     {
+                        if (!mask.King)
+                            data.damageBlockedWithMask = damage;
                         mask.donned = 1f;
                         stunBonus = -30;
                         damage = 0;
@@ -91,7 +154,7 @@ namespace GameruleSet
                     else if (!data.injured && !player.Malnourished)
                     {
                         data.injured = true;
-                        data.injuryCooldown = 5;
+                        data.injuryCooldown = 10;
                         stunBonus += damage * 30;
                         damage = 0;
 

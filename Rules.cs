@@ -15,10 +15,8 @@ namespace GameruleSet
         public ManualLogSource Logger { get; }
 
         public BoolRule Injury { get; }
-        public BoolRule FragileMask { get; }
-        public BoolRule Constitution { get; }
         public BoolRule Survival { get; }
-        public BoolRule Hardcore { get; }
+        public BoolRule Imbalanced { get; }
         public IntRule Corpulent { get; }
         public IntRule Insatiable { get; }
         public BoolRule Dislodge { get; }
@@ -34,14 +32,11 @@ namespace GameruleSet
             Injury = new BoolRule(false)
             {
                 ID = "injury",
-                Description = "When your body takes lethal damage while not already injured, you survive and become injured until you sleep. Additionally, vulture masks block damage to your head."
+                Description = "When your body takes lethal damage while not already injured, you survive and become injured until you sleep. Vulture masks prevent being killed by headshots, and king vulture masks prevent being stunned from headshots."
             };
-            FragileMask = new BoolRule(true) { ID = "injury/fragile_mask", Description = "When vulture masks block lethal damage, they break." };
-
-            Constitution = new BoolRule(false) { ID = "constitution", Description = "When stunned by a bite, you can still grab and throw items." };
 
             Survival = new BoolRule(false) { ID = "survival", Description = "If you die without a karma shield, you get a Hunter-style game over. Karma flowers don't respawn." };
-            Hardcore = new BoolRule(false) { ID = "survival/hardcore", Description = "Karma flowers don't spawn at all." };
+            Imbalanced = new BoolRule(false) { ID = "imbalanced", Description = "Karma flowers don't spawn at all." };
 
             Corpulent = new IntRule(1, 1, 4) { ID = "corpulent", Description = "You lose x times less hunger after sleeping." };
 
@@ -57,7 +52,8 @@ namespace GameruleSet
 
         internal void Initialize()
         {
-            new Injury(this).Initialize();
+            new Injury(this);
+            new Survival(this);
         }
 
         public EntityData GetData(EntityID entity) => data.TryGetValue(entity, out var ret) ? ret : (data[entity] = new());

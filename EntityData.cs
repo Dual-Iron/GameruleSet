@@ -6,6 +6,8 @@ namespace GameruleSet
     {
         public int injuryCooldown;
         public bool injured;
+        public float damageBlockedWithMask;
+        public float danger;
         public WeakReference? slugcatStats;
     }
 }
