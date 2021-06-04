@@ -9,5 +9,6 @@ namespace GameruleSet
         public float damageBlockedWithMask;
         public float danger;
         public WeakReference? slugcatStats;
+        public double hunger;
     }
 }

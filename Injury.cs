@@ -30,6 +30,14 @@ namespace GameruleSet
             On.Player.Update += Player_Update;
         }
 
+        private void ResetInjury(RainWorldGame game)
+        {
+            for (int i = 0; i < game.session.Players.Count; i++)
+            {
+                rules.GetData(game.session.Players[i].ID).injured = false;
+            }
+        }
+
         private VultureMask? GetGraspedMask(Player player)
         {
             foreach (var grasp in player.grasps)
@@ -59,14 +67,6 @@ namespace GameruleSet
                 }
             }
             return orig(self, obj, graspUsed, chunkGrabbed, shareability, dominance, overrideEquallyDominant, pacifying);
-        }
-
-        private void ResetInjury(RainWorldGame game)
-        {
-            for (int i = 0; i < game.session.Players.Count; i++)
-            {
-                rules.GetData(game.session.Players[i].ID).injured = false;
-            }
         }
 
         private void Player_Update(On.Player.orig_Update orig, Player self, bool eu)
@@ -140,7 +140,7 @@ namespace GameruleSet
                         if (!mask.King)
                             data.damageBlockedWithMask = damage;
                         mask.donned = 1f;
-                        stunBonus = -30;
+                        stunBonus = 0;
                         damage = 0;
                     }
                 }
