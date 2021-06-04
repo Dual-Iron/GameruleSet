@@ -40,12 +40,12 @@ namespace GameruleSet
 
             Insatiable = new FloatRule(1, 0, 4) { ID = "insatiable", Description = "Food gives x times more food pips." };
 
-            Dislodge = new BoolRule(false) { ID = "dislodge_spears", Description = "You can dislodge a stuck spear if you're hanging from it or if you're standing on solid ground adjacent to it." };
+            Dislodge = new BoolRule(false) { ID = "dislodge_spears", Description = "You can dislodge stuck spears. To do so, you have to be standing on solid ground or hanging from a pole or spear, and you can't be moving." };
 
-            SpearPersist = new BoolRule(false) { ID = "rainswept/spear_persistence", Description = "Stuck spears don't despawn." };
-            WetPersist = new BoolRule(false) { ID = "rainswept/dry_persistence", Description = "In areas that don't experience rain, items don't despawn, excluding rocks and spears." };
-            DryPersist = new BoolRule(false) { ID = "rainswept/wet_persistence", Description = "In areas that don't directly contact rain, items don't despawn, excluding rocks and spears." };
-            SoakedPersist = new BoolRule(false) { ID = "rainswept/soaked_persistence", Description = "In areas that directly contact rain, items don't despawn, excluding rocks and spears." };
+            SpearPersist = new BoolRule(false) { ID = "spear_persistence", Description = "When you stick a spear in a wall, it won't despawn." };
+            WetPersist = new BoolRule(false) { ID = "dry_persistence", Description = "In areas that don't experience rain, items don't despawn, excluding rocks and spears." };
+            DryPersist = new BoolRule(false) { ID = "wet_persistence", Description = "In areas that don't directly contact rain, items don't despawn, excluding rocks and spears." };
+            SoakedPersist = new BoolRule(false) { ID = "soaked_persistence", Description = "In areas that directly contact rain, items don't despawn, excluding rocks and spears." };
         }
 
         internal void Initialize()
@@ -55,6 +55,7 @@ namespace GameruleSet
             new Corpulent(this);
             new Insatiable(this);
             new Dislodge(this);
+            new Persistence(this);
         }
 
         public EntityData GetData(EntityID entity) => data.TryGetValue(entity, out var ret) ? ret : (data[entity] = new());

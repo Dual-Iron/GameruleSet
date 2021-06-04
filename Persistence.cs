@@ -1,5 +1,6 @@
 ﻿using RWCustom;
 using System;
+using System.Diagnostics;
 using System.Linq;
 using UnityEngine;
 
@@ -25,9 +26,9 @@ namespace GameruleSet
                 AbstractRoom abstractRoom = self.world.GetAbstractRoom(self.world.firstRoomIndex + i);
                 for (int j = 0; j < abstractRoom.entities.Count; j++)
                 {
-                    if (abstractRoom.entities[j] is AbstractPhysicalObject o && o.type != AbstractPhysicalObject.AbstractObjectType.Creature && o.type != AbstractPhysicalObject.AbstractObjectType.KarmaFlower && o.type != AbstractPhysicalObject.AbstractObjectType.Rock && o.type != AbstractPhysicalObject.AbstractObjectType.Spear && !abstractRoom.shelter)
+                    if (!abstractRoom.shelter && abstractRoom.entities[j] is AbstractPhysicalObject o && o.type != AbstractPhysicalObject.AbstractObjectType.Creature && o.type != AbstractPhysicalObject.AbstractObjectType.KarmaFlower && o.type != AbstractPhysicalObject.AbstractObjectType.Rock && o.type != AbstractPhysicalObject.AbstractObjectType.Spear)
                     {
-                        self.savedObjects.Add(abstractRoom.entities[j].ToString());
+                        self.savedObjects.Add(o.ToString());
                     }
                 }
             }
@@ -38,7 +39,7 @@ namespace GameruleSet
             orig(self, newMode);
             if (rules.SpearPersist.Value && newMode == Weapon.Mode.StuckInWall)
             {
-                if (self.abstractSpear.stuckInWallCycles > 0)
+                if (self.abstractSpear.stuckInWallCycles >= 0)
                     self.abstractSpear.stuckInWallCycles = int.MaxValue;
                 else
                     self.abstractSpear.stuckInWallCycles = int.MinValue;
