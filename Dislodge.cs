@@ -43,6 +43,7 @@ namespace GameruleSet
                         }
                     }
                 }
+                self.abstractSpear.stuckInWallCycles = 0;
             }
             orig(self, newMode);
         }
