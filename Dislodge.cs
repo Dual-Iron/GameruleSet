@@ -19,7 +19,7 @@ namespace GameruleSet
 
         private void Spear_ChangeMode(On.Spear.orig_ChangeMode orig, Spear self, Weapon.Mode newMode)
         {
-            if (rules.Dislodge.Value && self.mode == Weapon.Mode.StuckInWall)
+            if (rules.Dislodge && self.mode == Weapon.Mode.StuckInWall)
             {
                 if (self.abstractSpear.stuckInWallCycles >= 0)
                 {
@@ -53,7 +53,7 @@ namespace GameruleSet
             if (orig(self, obj))
                 return true;
 
-            if (!rules.Dislodge.Value || self.bodyMode != Player.BodyModeIndex.Stand && self.animation != Player.AnimationIndex.HangFromBeam || self.mainBodyChunk.vel.sqrMagnitude > 5f)
+            if (!rules.Dislodge || self.bodyMode == Player.BodyModeIndex.Default || self.bodyMode == Player.BodyModeIndex.ClimbingOnBeam && self.animation != Player.AnimationIndex.HangFromBeam || self.mainBodyChunk.vel.sqrMagnitude > 5f)
                 return false;
 
             for (int i = 0; i < self.input.Length; i++)

@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Net.NetworkInformation;
+using UnityEngine;
 
 namespace GameruleSet
 {
@@ -13,6 +15,7 @@ namespace GameruleSet
             On.HUD.FoodMeter.ctor += FoodMeter_ctor;
             On.Player.AddFood += Player_AddFood;
             On.Player.AddQuarterFood += Player_AddQuarterFood;
+            On.Player.FoodInRoom_Room_bool += Player_FoodInRoom_Room_bool;
 
             On.ProcessManager.SwitchMainProcess += (o, s, i) =>
             {
@@ -25,6 +28,12 @@ namespace GameruleSet
                 ResetHunger(s.game);
                 o(s);
             };
+        }
+
+        private int Player_FoodInRoom_Room_bool(On.Player.orig_FoodInRoom_Room_bool orig, Player self, Room checkRoom, bool eatAndDestroy)
+        {
+            int sum = orig(self, checkRoom, eatAndDestroy) - self.FoodInStomach;
+            return (int)(sum * rules.Insatiable + self.FoodInStomach + self.playerState.quarterFoodPoints * 0.25);
         }
 
         private void ResetHunger(RainWorldGame game)
@@ -46,7 +55,7 @@ namespace GameruleSet
         private void Player_AddQuarterFood(On.Player.orig_AddQuarterFood orig, Player self)
         {
             if (safe)
-                AddFood(self, 0.25 * rules.Insatiable.Value);
+                AddFood(self, 0.25 * rules.Insatiable);
             else
                 orig(self);
         }
@@ -54,7 +63,7 @@ namespace GameruleSet
         private void Player_AddFood(On.Player.orig_AddFood orig, Player self, int add)
         {
             if (safe)
-                AddFood(self, add * rules.Insatiable.Value);
+                AddFood(self, add * rules.Insatiable);
             else
                 orig(self, add);
         }

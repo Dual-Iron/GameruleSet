@@ -1,5 +1,6 @@
 ﻿using BepInEx.Logging;
 using Gamerules;
+using System;
 using System.Collections.Generic;
 
 namespace GameruleSet
@@ -19,10 +20,8 @@ namespace GameruleSet
         public FloatRule Corpulent { get; }
         public FloatRule Insatiable { get; }
         public BoolRule Dislodge { get; }
-        public BoolRule SpearPersist { get; }
-        public BoolRule WetPersist { get; }
-        public BoolRule DryPersist { get; }
-        public BoolRule SoakedPersist { get; }
+        public BoolRule StableSpears { get; }
+        public EnumRule<PersistenceEnum> Persistence { get; }
 
         internal Rules(ManualLogSource logger)
         {
@@ -40,12 +39,11 @@ namespace GameruleSet
 
             Insatiable = new FloatRule(1, 0, 4) { ID = "insatiable", Description = "Food gives x times more food pips." };
 
-            Dislodge = new BoolRule(false) { ID = "dislodge_spears", Description = "You can dislodge stuck spears. To do so, you have to be standing on solid ground or hanging from a pole or spear, and you can't be moving." };
+            Dislodge = new BoolRule(false) { ID = "dislodge_spears", Description = "You can dislodge stuck spears if you are standing nearby or hanging from them." };
 
-            SpearPersist = new BoolRule(false) { ID = "spear_persistence", Description = "When you stick a spear in a wall, it won't despawn." };
-            WetPersist = new BoolRule(false) { ID = "dry_persistence", Description = "In areas that don't experience rain, items don't despawn, excluding rocks and spears." };
-            DryPersist = new BoolRule(false) { ID = "wet_persistence", Description = "In areas that don't directly contact rain, items don't despawn, excluding rocks and spears." };
-            SoakedPersist = new BoolRule(false) { ID = "soaked_persistence", Description = "In areas that directly contact rain, items don't despawn, excluding rocks and spears." };
+            StableSpears = new BoolRule(false) { ID = "stable_spears", Description = "When you stick a spear in a wall, it won't fall off on its own." };
+
+            Persistence = new EnumRule<PersistenceEnum>(PersistenceEnum.None) { ID = "persistence", Description = "Determines when objects (excluding ephemeral items) should live through a cycle. 'All' means they don't despawn. 'Wet' means they don't despawn unless they're under open sky. 'Dry' means they don't despawn unless the room rains or floods. 'None' means they follow vanilla behavior." };
         }
 
         internal void Initialize()
@@ -56,6 +54,32 @@ namespace GameruleSet
             new Insatiable(this);
             new Dislodge(this);
             new Persistence(this);
+
+            On.OverseerTutorialBehavior.TutorialText += OverseerTutorialBehavior_TutorialText;
+        }
+
+        private void OverseerTutorialBehavior_TutorialText(On.OverseerTutorialBehavior.orig_TutorialText orig, OverseerTutorialBehavior self, string text, int wait, int time, bool hideHud)
+        {
+            if (text == "Three is enough to hibernate" || text == "Four is enough to hibernate" || text == "Additional food (above three) is kept for later" || text == "Additional food (above four) is kept for later")
+            {
+                int amount = (int)(self.player.slugcatStats.foodToHibernate / Insatiable);
+                string digit = amount switch 
+                {
+                    < 1 => "Any amount",
+                    1 => "One",
+                    2 => "Two",
+                    3 => "Three",
+                    4 => "Four",
+                    5 => "Five",
+                    6 => "Six",
+                    7 => "Seven",
+                    8 => "Eight",
+                    9 => "Nine",
+                    > 9 => amount.ToString(),
+                };
+                text = text.Replace("Three", digit).Replace("three", digit).Replace("Four", digit).Replace("four", digit);
+            }
+            orig(self, text, wait, time, hideHud);
         }
 
         public EntityData GetData(EntityID entity) => data.TryGetValue(entity, out var ret) ? ret : (data[entity] = new());

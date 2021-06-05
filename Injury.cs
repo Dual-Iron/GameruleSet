@@ -50,7 +50,7 @@ namespace GameruleSet
 
         private bool Creature_Grab(On.Creature.orig_Grab orig, Creature self, PhysicalObject obj, int graspUsed, int chunkGrabbed, Creature.Grasp.Shareability shareability, float dominance, bool overrideEquallyDominant, bool pacifying)
         {
-            if (rules.Injury.Value && obj is Player player)
+            if (rules.Injury && obj is Player player)
             {
                 if (rules.GetData(player.abstractCreature.ID).injuryCooldown > 0)
                 {
@@ -72,7 +72,7 @@ namespace GameruleSet
         private void Player_Update(On.Player.orig_Update orig, Player self, bool eu)
         {
             orig(self, eu);
-            if (!rules.Injury.Value)
+            if (!rules.Injury)
                 return;
             var data = rules.GetData(self.abstractCreature.ID);
             if (data.slugcatStats?.Target != self.slugcatStats && self.slugcatStats != null)
@@ -119,7 +119,7 @@ namespace GameruleSet
 
         private bool Creature_SpearStick(On.Creature.orig_SpearStick orig, Creature self, Weapon source, float dmg, BodyChunk chunk, PhysicalObject.Appendage.Pos appPos, Vector2 direction)
         {
-            if (rules.Injury.Value && self is Player player && chunk.index == 0 && GetGraspedMask(player) != null)
+            if (rules.Injury && self is Player player && chunk.index == 0 && GetGraspedMask(player) != null)
             {
                 return false;
             }
@@ -129,7 +129,7 @@ namespace GameruleSet
 
         private void Creature_Violence(On.Creature.orig_Violence orig, Creature self, BodyChunk source, Vector2? directionAndMomentum, BodyChunk hitChunk, PhysicalObject.Appendage.Pos hitAppendage, Creature.DamageType type, float damage, float stunBonus)
         {
-            if (rules.Injury.Value && self is Player player && damage >= self.Template.instantDeathDamageLimit)
+            if (rules.Injury && self is Player player && damage >= self.Template.instantDeathDamageLimit)
             {
                 var data = rules.GetData(player.abstractCreature.ID);
                 if (hitChunk.index == 0 && type != Creature.DamageType.Electric && type != Creature.DamageType.Explosion)

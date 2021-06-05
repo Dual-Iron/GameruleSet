@@ -25,7 +25,7 @@ namespace GameruleSet
         {
             var ret = orig(slugcatNum);
             var ratio = ret.y / (float)ret.x;
-            ratio = Mathf.Clamp((float)(ratio * rules.Corpulent.Value), 0, 1);
+            ratio = Mathf.Clamp((float)(ratio * rules.Corpulent), 0, 1);
             ret.y = (int)(ret.x * ratio);
             return ret;
         }
