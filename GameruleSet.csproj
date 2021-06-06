@@ -28,6 +28,7 @@
     <Reference Include="ref\Gamerules.dll" />
     <Reference Include="$(BepPath)\core\BepInEx.dll" />
     <Reference Include="$(BepPath)\core\BepInEx.Preloader.dll" />
+    <Reference Include="$(BepPath)\core\Mono.Cecil.dll" />
     <Reference Include="$(BepPath)\core\MonoMod.dll" />
     <Reference Include="$(BepPath)\core\MonoMod.Utils.dll" />
     <Reference Include="$(BepPath)\core\MonoMod.RuntimeDetour.dll" />

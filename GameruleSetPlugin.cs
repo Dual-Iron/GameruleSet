@@ -14,7 +14,6 @@ namespace GameruleSet
             try
             {
                 Gamerules = new(Logger);
-                Gamerules.Initialize();
             }
             catch (Exception e)
             {

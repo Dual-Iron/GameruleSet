@@ -1,8 +1,5 @@
-﻿using RWCustom;
-using System;
-using System.Diagnostics;
+﻿using System;
 using System.IO;
-using System.Linq;
 using UnityEngine;
 
 namespace GameruleSet
@@ -41,50 +38,51 @@ namespace GameruleSet
                 {
                     if (abstractRoom.entities[j] is AbstractPhysicalObject o && o.type != AbstractPhysicalObject.AbstractObjectType.Creature && o.type != AbstractPhysicalObject.AbstractObjectType.KarmaFlower && o.type != AbstractPhysicalObject.AbstractObjectType.Rock && (o.type != AbstractPhysicalObject.AbstractObjectType.Spear || o is AbstractSpear s && s.explosive) && (o is not AbstractConsumable c || c.isConsumed))
                     {
-                        room ??= new Room(self.world.game, self.world, abstractRoom);
-
-                        bool cont = false;
-                        foreach (var placedObject in room.roomSettings.placedObjects)
-                        {
-                            if (placedObject.type == PlacedObject.Type.ScavengerOutpost || placedObject.type == PlacedObject.Type.ScavengerTreasury)
-                            {
-                                cont = true;
-                                break;
-                            }
-                        }
-
-                        if (cont)
-                            continue;
-
-                        // Don't need to calculate anything if it's All
-                        if (rules.Persistence.Value == PersistenceEnum.All)
+                        if (PersistenceApplies(ref room, ref rain, self.world, o.pos))
                         {
                             self.savedObjects.Add(o.ToString());
-                        }
-                        else
-                        {
-                            // If (dry) or (wet, and wet rule is enabled), don't calculate anything further
-                            if (room.roomSettings.DangerType == RoomRain.DangerType.None || rules.Persistence.Value == PersistenceEnum.Wet && room.roomSettings.DangerType == RoomRain.DangerType.Flood)
-                            {
-                                self.savedObjects.Add(o.ToString());
-                            }
-                            else
-                            {
-                                // Check if rain reaches position and save if it doesn't
-                                if (rain == null)
-                                {
-                                    room.LoadFromDataString(File.ReadAllLines(WorldLoader.FindRoomFileDirectory(room.abstractRoom.name, false) + ".txt"));
-                                    rain = new(self.world.game.globalRain, room);
-                                }
-
-                                var isInRain = rain.rainReach[o.pos.Tile.x] <= o.pos.Tile.y;
-                                if (!isInRain)
-                                    self.savedObjects.Add(o.ToString());
-                            }
                         }
                     }
                 }
             }
+        }
+
+        public bool PersistenceApplies(ref Room? room, ref RoomRain? roomRain, World world, WorldCoordinate coord)
+        {
+            if (rules.Persistence.Value == PersistenceEnum.None)
+                return false;
+
+            room ??= new Room(world.game, world, world.GetAbstractRoom(coord));
+
+            // Forbid scav outputs/treasuries; they generate items
+            foreach (var placedObject in room.roomSettings.placedObjects)
+            {
+                if (placedObject.type == PlacedObject.Type.ScavengerOutpost || placedObject.type == PlacedObject.Type.ScavengerTreasury)
+                {
+                    return false;
+                }
+            }
+
+            // Don't need to calculate anything if it's All
+            if (rules.Persistence.Value == PersistenceEnum.All)
+                return true;
+
+            // If dry, we're good
+            if (room.roomSettings.DangerType == RoomRain.DangerType.None)
+                return true;
+
+            // If not, and the rule is set to dry, abandon ship
+            if (rules.Persistence.Value == PersistenceEnum.Dry)
+                return false;
+
+            // Rule must be wet. Check if rain reaches position and save if it doesn't
+            if (roomRain == null)
+            {
+                room.LoadFromDataString(File.ReadAllLines(WorldLoader.FindRoomFileDirectory(room.abstractRoom.name, false) + ".txt"));
+                roomRain = new(world.game.globalRain, room);
+            }
+
+            return roomRain.rainReach[coord.Tile.x] > coord.Tile.y;
         }
 
         private void Spear_ChangeMode(On.Spear.orig_ChangeMode orig, Spear self, Weapon.Mode newMode)

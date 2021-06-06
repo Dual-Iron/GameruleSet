@@ -7,6 +7,8 @@ namespace GameruleSet
 {
     public sealed class Rules
     {
+        public static Rules? CurrentRules { get; private set; }
+
         private readonly Dictionary<EntityID, EntityData> data = new();
 
         private RainWorld? rw;
@@ -22,9 +24,20 @@ namespace GameruleSet
         public BoolRule Dislodge { get; }
         public BoolRule StableSpears { get; }
         public EnumRule<PersistenceEnum> Persistence { get; }
+        public BoolRule SaveShelterPositions { get; }
+        public BoolRule SleepAnywhere { get; }
+
+        public Injury ImplInjury { get; }
+        public Imbalanced ImplImbalanced { get; }
+        public Corpulent ImplCorpulent { get; }
+        public Insatiable ImplInsatiable { get; }
+        public Dislodge ImplDislodge { get; }
+        public Persistence ImplPersistence { get; }
 
         internal Rules(ManualLogSource logger)
         {
+            CurrentRules = this;
+
             Logger = logger;
 
             Injury = new BoolRule(false)
@@ -44,16 +57,17 @@ namespace GameruleSet
             StableSpears = new BoolRule(false) { ID = "stable_spears", Description = "When you stick a spear in a wall, it won't fall off on its own." };
 
             Persistence = new EnumRule<PersistenceEnum>(PersistenceEnum.None) { ID = "persistence", Description = "Determines when objects (excluding ephemeral items) should live through a cycle. 'All' means they don't despawn. 'Wet' means they don't despawn unless they're under open sky. 'Dry' means they don't despawn unless the room rains or floods. 'None' means they follow vanilla behavior." };
-        }
 
-        internal void Initialize()
-        {
-            new Injury(this);
-            new Imbalanced(this);
-            new Corpulent(this);
-            new Insatiable(this);
-            new Dislodge(this);
-            new Persistence(this);
+            SaveShelterPositions = new BoolRule(false) { ID = "save_shelter_positions", Description = "Creatures' positions aren't reset when you wake up in a shelter." };
+
+            SleepAnywhere = new BoolRule(false) { ID = "sleep_anywhere", Description = "Lets you sleep anywhere by holding down for long enough." };
+
+            ImplInjury = new Injury(this);
+            ImplImbalanced = new Imbalanced(this);
+            ImplCorpulent = new Corpulent(this);
+            ImplInsatiable = new Insatiable(this);
+            ImplDislodge = new Dislodge(this);
+            ImplPersistence = new Persistence(this);
 
             On.OverseerTutorialBehavior.TutorialText += OverseerTutorialBehavior_TutorialText;
         }
