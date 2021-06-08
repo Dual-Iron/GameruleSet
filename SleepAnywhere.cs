@@ -150,7 +150,7 @@ namespace GameruleSet
         {
             orig(self, eu);
 
-            if (!rules.SleepAnywhere || self.abstractCreature.Room.shelter || !self.room.game.IsStorySession)
+            if (!rules.SleepAnywhere || (self.abstractCreature.Room?.shelter ?? true) || !self.abstractCreature.world.game.IsStorySession)
             {
                 return;
             }
