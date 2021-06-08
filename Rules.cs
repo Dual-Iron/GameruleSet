@@ -7,7 +7,7 @@ namespace GameruleSet
 {
     public sealed class Rules
     {
-        public static Rules? CurrentRules { get; private set; }
+        internal static Rules? CurrentRules { get; private set; }
 
         private readonly Dictionary<EntityID, EntityData> data = new();
 
@@ -25,14 +25,8 @@ namespace GameruleSet
         public BoolRule StableSpears { get; }
         public EnumRule<PersistenceEnum> Persistence { get; }
         public BoolRule SaveShelterPositions { get; }
+        public FloatRule CycleLength { get; }
         public BoolRule SleepAnywhere { get; }
-
-        public Injury ImplInjury { get; }
-        public Imbalanced ImplImbalanced { get; }
-        public Corpulent ImplCorpulent { get; }
-        public Insatiable ImplInsatiable { get; }
-        public Dislodge ImplDislodge { get; }
-        public Persistence ImplPersistence { get; }
 
         internal Rules(ManualLogSource logger)
         {
@@ -60,14 +54,19 @@ namespace GameruleSet
 
             SaveShelterPositions = new BoolRule(false) { ID = "save_shelter_positions", Description = "Creatures' positions aren't reset when you wake up in a shelter." };
 
-            SleepAnywhere = new BoolRule(false) { ID = "sleep_anywhere", Description = "Lets you sleep anywhere by holding down for long enough." };
+            CycleLength = new FloatRule(1) { ID = "cycle_length", Description = "Multiplier for cycle length." };
 
-            ImplInjury = new Injury(this);
-            ImplImbalanced = new Imbalanced(this);
-            ImplCorpulent = new Corpulent(this);
-            ImplInsatiable = new Insatiable(this);
-            ImplDislodge = new Dislodge(this);
-            ImplPersistence = new Persistence(this);
+            SleepAnywhere = new BoolRule(false) { ID = "sleep_anywhere", Description = "Lets you sleep anywhere by holding crouch on a solid, flat surface. May not work correctly if 'save_shelter_positions' is false." };
+
+            new Injury(this);
+            new Imbalanced(this);
+            new Corpulent(this);
+            new Insatiable(this);
+            new Dislodge(this);
+            new Persistence(this);
+            new CycleLength(this);
+            new SaveShelterPositions(this);
+            new SleepAnywhere(this);
 
             On.OverseerTutorialBehavior.TutorialText += OverseerTutorialBehavior_TutorialText;
         }
@@ -91,6 +90,10 @@ namespace GameruleSet
                     9 => "Nine",
                     > 9 => amount.ToString(),
                 };
+
+                if (!text.StartsWith("Three") && !text.StartsWith("Four"))
+                    digit = digit.ToLower();
+
                 text = text.Replace("Three", digit).Replace("three", digit).Replace("Four", digit).Replace("four", digit);
             }
             orig(self, text, wait, time, hideHud);

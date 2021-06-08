@@ -26,6 +26,7 @@
 
   <ItemGroup>
     <Reference Include="ref\Gamerules.dll" />
+    <Reference Include="ref\StaticTables.dll" />
     <Reference Include="$(BepPath)\core\BepInEx.dll" />
     <Reference Include="$(BepPath)\core\BepInEx.Preloader.dll" />
     <Reference Include="$(BepPath)\core\Mono.Cecil.dll" />
