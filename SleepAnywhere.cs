@@ -36,7 +36,8 @@ namespace GameruleSet
             On.HUD.HUD.Update += HUD_Update;
             On.MainLoopProcess.RawUpdate += MainLoopProcess_RawUpdate;
 
-            new Hook(typeof(VirtualMicrophone).GetMethod("get_InWorldSoundsVolumeGoal"), (Func<Func<VirtualMicrophone, float>, VirtualMicrophone, float>)GetterInWorldSoundsVolumeGoal);
+            new Hook(typeof(VirtualMicrophone).GetMethod("get_InWorldSoundsVolumeGoal"), (Func<Func<VirtualMicrophone, float>, VirtualMicrophone, float>)GetterInWorldSoundsVolumeGoal)
+                .Apply();
         }
 
         private void Player_ctor(On.Player.orig_ctor orig, Player self, AbstractCreature abstractCreature, World world)
@@ -198,19 +199,20 @@ namespace GameruleSet
             }
             else if (sleepData.groggy > 0)
             {
-                self.slowMovementStun = (int)(15 * Mathf.InverseLerp(0, maxGroggy, sleepData.groggy));
+                self.slowMovementStun = (int)(10 * Mathf.InverseLerp(0, maxGroggy, sleepData.groggy));
                 if (sleepData.sleepingFor > 0 || UnityEngine.Random.value < 0.15f)
                 {
                     self.Blink(12);
                 }
             }
 
-            int global = GetGlobalSleepingFor(self.room.game);
-            if (global >= maxSleeping && self.room.world.rainCycle.TimeUntilRain < -400)
+            var world = self.abstractCreature.world;
+            int global = GetGlobalSleepingFor(world.game);
+            if (global >= maxSleeping && world.rainCycle.TimeUntilRain < -400)
             {
-                int foodInStomach = self.room.game.Players.Max(a => a?.realizedCreature is Player p ? p.playerState.foodInStomach : 0);
-                int foodToHibernate = self.room.game.Players.Max(a => a?.realizedCreature is Player p ? p.slugcatStats.foodToHibernate : 0);
-                self.room.game.Win(foodInStomach < foodToHibernate);
+                int foodInStomach = world.game.Players.Max(a => a?.realizedCreature is Player p ? p.playerState.foodInStomach : 0);
+                int foodToHibernate = world.game.Players.Max(a => a?.realizedCreature is Player p ? p.slugcatStats.foodToHibernate : 0);
+                world.game.Win(foodInStomach < foodToHibernate);
             }
         }
     }
