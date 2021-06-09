@@ -40,7 +40,7 @@ namespace GameruleSet
                 Description = "When your body takes lethal damage while not already injured, you survive and become injured until you sleep. Vulture masks prevent being killed by headshots, and king vulture masks prevent being stunned from headshots."
             };
 
-            Imbalanced = new BoolRule(false) { ID = "imbalanced", Description = "Karma flowers don't spawn." };
+            Imbalanced = new BoolRule(false) { ID = "karmically_imbalanced", Description = "Karma flowers don't spawn." };
 
             Corpulent = new FloatRule(1, 0, 4) { ID = "corpulent", Description = "How much food is needed to hibernate. A value greater than 1 means more, and a value less than 1 means less." };
 
