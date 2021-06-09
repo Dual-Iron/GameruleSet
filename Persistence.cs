@@ -37,7 +37,6 @@ namespace GameruleSet
             if (self.state.alive && self.world.game.session is StoryGameSession sess)
             {
                 self.Data().Get<AbstractCreatureData>().dayDead = sess.saveState.cycleNumber;
-                Console.WriteLine(self + " died");
             }
             orig(self);
         }
@@ -69,7 +68,6 @@ namespace GameruleSet
                     if (int.TryParse(data[1], out int dayDead))
                     {
                         critter.Data().Get<AbstractCreatureData>().dayDead = dayDead;
-                        Console.WriteLine(critter + " dead: " + (world.game.GetStorySession.saveState.cycleNumber - dayDead) + " days old");
                     }
                 }
                 return critter;
