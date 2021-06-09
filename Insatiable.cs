@@ -12,6 +12,7 @@ namespace GameruleSet
         {
             this.rules = rules;
 
+            On.OverseerTutorialBehavior.TutorialText += OverseerTutorialBehavior_TutorialText;
             On.HUD.FoodMeter.ctor += FoodMeter_ctor;
             On.Player.AddFood += Player_AddFood;
             On.Player.AddQuarterFood += Player_AddQuarterFood;
@@ -28,6 +29,34 @@ namespace GameruleSet
                 ResetHunger(s.game);
                 o(s);
             };
+        }
+
+        private void OverseerTutorialBehavior_TutorialText(On.OverseerTutorialBehavior.orig_TutorialText orig, OverseerTutorialBehavior self, string text, int wait, int time, bool hideHud)
+        {
+            if (text == "Three is enough to hibernate" || text == "Four is enough to hibernate" || text == "Additional food (above three) is kept for later" || text == "Additional food (above four) is kept for later")
+            {
+                int amount = (int)(self.player.slugcatStats.foodToHibernate / rules.Insatiable);
+                string digit = amount switch
+                {
+                    < 1 => "Any amount",
+                    1 => "One",
+                    2 => "Two",
+                    3 => "Three",
+                    4 => "Four",
+                    5 => "Five",
+                    6 => "Six",
+                    7 => "Seven",
+                    8 => "Eight",
+                    9 => "Nine",
+                    > 9 => amount.ToString(),
+                };
+
+                if (!text.StartsWith("Three") && !text.StartsWith("Four"))
+                    digit = digit.ToLower();
+
+                text = text.Replace("Three", digit).Replace("three", digit).Replace("Four", digit).Replace("four", digit);
+            }
+            orig(self, text, wait, time, hideHud);
         }
 
         private int Player_FoodInRoom_Room_bool(On.Player.orig_FoodInRoom_Room_bool orig, Player self, Room checkRoom, bool eatAndDestroy)

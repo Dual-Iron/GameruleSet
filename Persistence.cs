@@ -1,5 +1,6 @@
 ﻿using Mono.Cecil.Cil;
 using MonoMod.Cil;
+using StaticTables;
 using System;
 using System.IO;
 using UnityEngine;
@@ -8,13 +9,21 @@ namespace GameruleSet
 {
     public class Persistence
     {
+        struct AbstractCreatureData : IWeakData<AbstractCreature>
+        {
+            public int dayDead;
+            void IDisposable.Dispose() { }
+            void IWeakData<AbstractCreature>.Initialize(AbstractCreature owner, object? state) => dayDead = -1;
+        }
+
         private readonly Rules rules;
 
         public Persistence(Rules rules)
         {
             this.rules = rules;
 
-            IL.AbstractCreature.RealizeInRoom += AbstractCreature_RealizeInRoom;
+            On.SaveState.AbstractCreatureFromString += SaveState_AbstractCreatureFromString;
+            On.SaveState.AbstractCreatureToString_AbstractCreature_WorldCoordinate += SaveState_AbstractCreatureToString_AbstractCreature_WorldCoordinate;
             IL.RegionState.AdaptWorldToRegionState += RegionState_AdaptWorldToRegionState;
             On.RegionState.CreatureToStringInDenPos += RegionState_CreatureToStringInDenPos;
 
@@ -22,37 +31,63 @@ namespace GameruleSet
             On.RegionState.AdaptRegionStateToWorld += RegionState_AdaptRegionStateToWorld;
         }
 
-        private void AbstractCreature_RealizeInRoom(ILContext il)
+        private AbstractCreature SaveState_AbstractCreatureFromString(On.SaveState.orig_AbstractCreatureFromString orig, World world, string creatureString, bool onlyInCurrentRegion)
         {
             try
             {
-                var cursor = new ILCursor(il);
-
-                // Find end of shelter check
-                if (!cursor.TryGotoNext(i => i.MatchCall<WorldCoordinate>("get_NodeDefined")))
+                var origRet = orig(world, creatureString, onlyInCurrentRegion);
+                var data = creatureString.Split(new[] { "<cPOS>" }, StringSplitOptions.None);
+                if (data.Length >= 4 && rules.Persistence.Value != PersistenceEnum.None)
                 {
-                    rules.Logger.LogError("RealizeInRoom: Missing instruction");
-                    return;
+                    if (int.TryParse(data[1], out int x) && int.TryParse(data[2], out int y))
+                    {
+                        origRet.pos.x = x;
+                        origRet.pos.y = y;
+                        origRet.InDen = data[3] == "1";
+                    }
                 }
-
-                var brTo = cursor.Instrs[cursor.Index - 2];
-
-                // Go back to start of method
-                cursor.Index = 0;
-
-                // Emit skip
-                cursor.EmitDelegate<Func<bool>>(SkipVanillaCheck);
-                cursor.Emit(OpCodes.Brtrue, brTo);
-
-                static bool SkipVanillaCheck()
+                data = creatureString.Split(new[] { "<cDEATH>" }, StringSplitOptions.None);
+                if (data.Length >= 3 && rules.Persistence.Value != PersistenceEnum.None)
                 {
-                    return Rules.CurrentRules?.SaveShelterPositions?.Value ?? false;
+                    if (int.TryParse(data[1], out int dayDead))
+                    {
+                        origRet.Data().Get<AbstractCreatureData>().dayDead = dayDead;
+                    }
                 }
+                return origRet;
             }
             catch (Exception e)
             {
-                rules.Logger.LogError(e);
+                rules.Logger.LogError(creatureString + ": " + e);
+                throw;
             }
+        }
+
+        private string SaveState_AbstractCreatureToString_AbstractCreature_WorldCoordinate(On.SaveState.orig_AbstractCreatureToString_AbstractCreature_WorldCoordinate orig, AbstractCreature critter, WorldCoordinate pos)
+        {
+            ref var data = ref critter.Data().Get<AbstractCreatureData>();
+            if (critter.state.alive)
+            {
+                data.dayDead = -1;
+            }
+            else
+            {
+                if (data.dayDead == -1 && critter.world.game.session is StoryGameSession sess)
+                {
+                    data.dayDead = sess.saveState.cycleNumber;
+                    Console.WriteLine($"Newly dead {critter.creatureTemplate.type} {critter.ID}: {data.dayDead}");
+                }
+                else Console.WriteLine($"Oldly dead {critter.creatureTemplate.type} {critter.ID}: {data.dayDead}");
+                if (critter.Room.shelter)
+                    data.dayDead++;
+            }
+
+            string ret = $"{orig(critter, pos)}<cC><cPOS>{pos.x}<cPOS>{pos.y}<cPOS>{(critter.InDen ? 1 : 0)}<cPOS>";
+
+            if (data.dayDead != -1)
+                ret += $"<cDEATH>{data.dayDead}<cDEATH>";
+
+            return ret;
         }
 
         private void RegionState_AdaptWorldToRegionState(ILContext il)
@@ -81,10 +116,12 @@ namespace GameruleSet
 
                 static bool CanLoadPosition(AbstractCreature c)
                 {
-                    if (c.creatureTemplate.type == CreatureTemplate.Type.PoleMimic || c.creatureTemplate.type == CreatureTemplate.Type.TentaclePlant)
+                    // Don't set pos of pole mimic or tentacle plant
+                    if (c.creatureTemplate.offScreenSpeed == 0)
                     {
                         return false;
                     }
+                    // Don't set pos of a creature that's disposed of
                     if (c.InDen || c.Room.offScreenDen || c.pos.x == -1 || c.pos.y == -1)
                     {
                         return false;
@@ -117,24 +154,35 @@ namespace GameruleSet
 
             WorldCoordinate? GetPos(RegionState self, AbstractCreature critter, int validSaveShelter, int activeGate)
             {
+                // Don't save creatures in gates or slugcats
                 if (critter.creatureTemplate.type == CreatureTemplate.Type.Slugcat || critter.pos.room == activeGate)
                 {
                     return null;
                 }
-                if (critter.state.dead || critter.creatureTemplate.offScreenSpeed == 0f)
+                // If it's dead...
+                if (critter.state.dead)
                 {
+                    // If it's in a shelter, save it accordingly
                     if (self.world.GetAbstractRoom(critter.pos).shelter)
                     {
                         return rules.SaveShelterPositions ? critter.pos : new(critter.pos.room, -1, -1, 0);
                     }
+                    // Otherwise, if it's 3 or more days old, put it back in its den
+                    if (self.saveState.cycleNumber - 3 >= critter.Data().Get<AbstractCreatureData>().dayDead)
+                    {
+                        return critter.abstractAI?.denPosition;
+                    }
+                    // Otherwise, check if persistence applies. If so, save it!
                     Room? room = null;
                     RoomRain? rain = null;
                     return PersistenceApplies(ref room, ref rain, self.world, critter.pos) ? critter.pos : null;
                 }
+                // If it's alive in the slugcat's shelter, save it accordingly
                 if (critter.pos.room == validSaveShelter)
                 {
                     return rules.SaveShelterPositions ? critter.pos : new(critter.pos.room, -1, -1, 0);
                 }
+                // Alive somewhere other than player's den, so put it back in its own den.
                 return critter.abstractAI?.denPosition;
             }
         }

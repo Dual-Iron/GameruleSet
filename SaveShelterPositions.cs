@@ -5,6 +5,7 @@ using Gamerules;
 using Mono.Cecil.Cil;
 using MonoMod.Cil;
 using RWCustom;
+using StaticTables;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -51,48 +52,44 @@ namespace GameruleSet
 
             this.rules = rules;
 
-            On.SaveState.AbstractCreatureFromString += SaveState_AbstractCreatureFromString;
-            On.SaveState.AbstractCreatureToString_AbstractCreature_WorldCoordinate += SaveState_AbstractCreatureToString_AbstractCreature_WorldCoordinate;
+            IL.AbstractCreature.RealizeInRoom += AbstractCreature_RealizeInRoom;
             On.SaveState.BringUpToDate += SaveState_BringUpToDate;
             On.SaveState.SaveToString += SaveState_SaveToString;
             On.SaveState.LoadGame += SaveState_LoadGame;
             On.PlayerState.ctor += PlayerState_ctor;
         }
 
-        private AbstractCreature SaveState_AbstractCreatureFromString(On.SaveState.orig_AbstractCreatureFromString orig, World world, string creatureString, bool onlyInCurrentRegion)
+        private void AbstractCreature_RealizeInRoom(ILContext il)
         {
             try
             {
-                var origRet = orig(world, creatureString, onlyInCurrentRegion);
-                try
+                var cursor = new ILCursor(il);
+
+                // Find end of shelter check
+                if (!cursor.TryGotoNext(i => i.MatchCall<WorldCoordinate>("get_NodeDefined")))
                 {
-                    var data = creatureString.Split(new[] { "<cPOS>" }, StringSplitOptions.None);
-                    if (data.Length >= 4 && rules.Persistence.Value != PersistenceEnum.None)
-                    {
-                        if (int.TryParse(data[1], out int x) && int.TryParse(data[2], out int y))
-                        {
-                            origRet.pos.x = x;
-                            origRet.pos.y = y;
-                            origRet.InDen = data[3] == "1";
-                        }
-                    }
+                    rules.Logger.LogError("RealizeInRoom: Missing instruction");
+                    return;
                 }
-                catch (Exception e)
+
+                var brTo = cursor.Instrs[cursor.Index - 2];
+
+                // Go back to start of method
+                cursor.Index = 0;
+
+                // Emit skip
+                cursor.EmitDelegate<Func<bool>>(SkipVanillaCheck);
+                cursor.Emit(OpCodes.Brtrue, brTo);
+
+                static bool SkipVanillaCheck()
                 {
-                    rules.Logger.LogError(creatureString + ": " + e);
+                    return Rules.CurrentRules?.SaveShelterPositions?.Value ?? false;
                 }
-                return origRet;
             }
             catch (Exception e)
             {
-                rules.Logger.LogError(creatureString + ": " + e);
-                throw;
+                rules.Logger.LogError(e);
             }
-        }
-
-        private string SaveState_AbstractCreatureToString_AbstractCreature_WorldCoordinate(On.SaveState.orig_AbstractCreatureToString_AbstractCreature_WorldCoordinate orig, AbstractCreature critter, WorldCoordinate pos)
-        {
-            return $"{orig(critter, pos)}<cC><cPOS>{pos.x}<cPOS>{pos.y}<cPOS>{(critter.InDen ? 1 : 0)}<cPOS>";
         }
 
         private void SaveState_BringUpToDate(On.SaveState.orig_BringUpToDate orig, SaveState self, RainWorldGame game)
