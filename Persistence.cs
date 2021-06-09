@@ -3,7 +3,6 @@ using MonoMod.Cil;
 using StaticTables;
 using System;
 using System.IO;
-using UnityEngine;
 
 namespace GameruleSet
 {

@@ -1,55 +1,32 @@
 ﻿// TODO port this to another mod
 // TODO port "Sleep Anywhere" to another mod
 
-using Gamerules;
 using Mono.Cecil.Cil;
 using MonoMod.Cil;
 using RWCustom;
 using StaticTables;
 using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Runtime.InteropServices;
 using System.Text;
-using UnityEngine;
 
 namespace GameruleSet
 {
     public class SaveShelterPositions
     {
-        private readonly Rules rules;
-
-        private static readonly Dictionary<IntTuple, PlayerDenData> data = new();
-
-        class PlayerDenData
+        struct SaveStateData : IWeakData<SaveState>
         {
-            public PlayerDenData() { pos = new IntVector2[0]; }
-
             public IntVector2[] pos;
-        }
 
-        struct IntTuple
-        {
-            public int a;
-            public int b;
-
-            public override int GetHashCode() => unchecked((2118541809 * -1521134295 + a) * -1521134295 + b);
-        }
-
-        private PlayerDenData GetFor(SaveState self)
-        {
-            var key = new IntTuple { a = rules.RW.options.saveSlot, b = self.saveStateNumber };
-            if (!data.TryGetValue(key, out var denData))
+            void IDisposable.Dispose() { }
+            void IWeakData<SaveState>.Initialize(SaveState owner, object? state)
             {
-                data[key] = denData = new();
+                pos = new IntVector2[0];
             }
-            return denData;
         }
+
+        private readonly Rules rules;
 
         public SaveShelterPositions(Rules rules)
         {
-            data.Clear();
-
             this.rules = rules;
 
             IL.AbstractCreature.RealizeInRoom += AbstractCreature_RealizeInRoom;
@@ -98,7 +75,7 @@ namespace GameruleSet
             {
                 orig(self, game);
 
-                var denData = GetFor(self);
+                ref var denData = ref self.Data().Get<SaveStateData>();
                 denData.pos = new IntVector2[game.Players.Count];
                 for (int i = 0; i < game.Players.Count; i++)
                 {
@@ -116,7 +93,7 @@ namespace GameruleSet
         {
             try
             {
-                var pos = GetFor(self).pos;
+                var pos = self.Data().Get<SaveStateData>().pos;
                 var sb = new StringBuilder();
                 for (int i = 0; i < pos.Length; i++)
                 {
@@ -137,7 +114,7 @@ namespace GameruleSet
             {
                 orig(self, str, game);
 
-                var denData = GetFor(self);
+                ref var denData = ref self.Data().Get<SaveStateData>();
                 var split = str.Split(new[] { "<DENTILE>" }, StringSplitOptions.None);
 
                 if (split.Length == 3)
@@ -172,7 +149,7 @@ namespace GameruleSet
             orig(self, crit, playerNumber, slugcatCharacter, isGhost);
             if (crit.world.game.session is StoryGameSession sess)
             {
-                var denData = GetFor(sess.saveState);
+                ref var denData = ref sess.saveState.Data().Get<SaveStateData>();
                 if (playerNumber < denData.pos.Length)
                 {
                     crit.pos.Tile = denData.pos[playerNumber];

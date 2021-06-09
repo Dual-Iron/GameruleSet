@@ -1,30 +1,10 @@
-﻿using RWCustom;
-using StaticTables;
-using System;
-using System.Linq;
+﻿using StaticTables;
 using UnityEngine;
 
 namespace GameruleSet
 {
     public class Injury
     {
-        struct PlayerData : IWeakData<AbstractCreature>
-        {
-            public int injuryCooldown;
-            public bool injured;
-            public float damageBlockedWithMask;
-            public float danger;
-            public double hunger;
-            public UnmanagedWeakRef<SlugcatStats> slugcatStats;
-
-            void IDisposable.Dispose()
-            {
-                slugcatStats.Dispose();
-            }
-
-            void IWeakData<AbstractCreature>.Initialize(AbstractCreature owner, object? state) { }
-        }
-
         private readonly Rules rules;
 
         public Injury(Rules rules)
@@ -90,12 +70,15 @@ namespace GameruleSet
         private void Player_Update(On.Player.orig_Update orig, Player self, bool eu)
         {
             orig(self, eu);
+
             if (!rules.Injury)
                 return;
+
             ref var data = ref self.abstractCreature.Data().Get<PlayerData>();
-            if (data.slugcatStats != self.slugcatStats && self.slugcatStats != null)
+
+            if (self.slugcatStats != null && data.cachedSlugcatStats != self.slugcatStats)
             {
-                data.slugcatStats = new(self.slugcatStats);
+                data.cachedSlugcatStats.Value = self.slugcatStats;
                 if (data.injured)
                 {
                     self.slugcatStats.bodyWeightFac *= 0.9f;
@@ -149,7 +132,7 @@ namespace GameruleSet
         {
             if (rules.Injury && self is Player player && damage >= self.Template.instantDeathDamageLimit)
             {
-                var data = rules.GetData(player.abstractCreature.ID);
+                ref var data = ref player.abstractCreature.Data().Get<PlayerData>();
                 if (hitChunk.index == 0 && type != Creature.DamageType.Electric && type != Creature.DamageType.Explosion)
                 {
                     var mask = GetGraspedMask(player);

@@ -1,13 +1,4 @@
-﻿using MonoMod.RuntimeDetour;
-using MonoMod.Utils;
-using Music;
-using RWCustom;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-
-namespace GameruleSet
+﻿namespace GameruleSet
 {
     public class Imbalanced
     {

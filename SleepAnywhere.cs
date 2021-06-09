@@ -1,5 +1,4 @@
 ﻿using MonoMod.RuntimeDetour;
-using RWCustom;
 using StaticTables;
 using System;
 using System.Linq;

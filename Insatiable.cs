@@ -1,6 +1,4 @@
-﻿using System;
-using System.Net.NetworkInformation;
-using UnityEngine;
+﻿using StaticTables;
 
 namespace GameruleSet
 {
@@ -67,9 +65,9 @@ namespace GameruleSet
 
         private void ResetHunger(RainWorldGame game)
         {
-            for (int i = 0; i < game.session.Players.Count; i++)
+            foreach (var abstractPlayer in game.session.Players)
             {
-                rules.GetData(game.session.Players[i].ID).hunger = 0;
+                abstractPlayer.Data().Get<PlayerData>().hunger = 0;
             }
         }
 
@@ -99,13 +97,14 @@ namespace GameruleSet
 
         private void AddFood(Player player, double amount)
         {
-            var data = rules.GetData(player.abstractCreature.ID);
+            ref var data = ref player.abstractCreature.Data().Get<PlayerData>();
 
             amount += data.hunger;
 
             int amountFloored = (int)amount;
 
             amount -= amountFloored;
+
             safe = false;
 
             player.AddFood(amountFloored);
@@ -113,10 +112,12 @@ namespace GameruleSet
             while (amount >= 0.25)
             {
                 amount -= 0.25;
+
                 player.AddQuarterFood();
             }
 
             data.hunger = amount;
+
             safe = true;
         }
     }

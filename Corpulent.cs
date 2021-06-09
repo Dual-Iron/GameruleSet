@@ -1,11 +1,4 @@
-﻿using MonoMod.RuntimeDetour;
-using MonoMod.Utils;
-using Music;
-using RWCustom;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+﻿using RWCustom;
 using UnityEngine;
 
 namespace GameruleSet

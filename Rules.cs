@@ -1,7 +1,5 @@
 ﻿using BepInEx.Logging;
 using Gamerules;
-using System;
-using System.Collections.Generic;
 
 namespace GameruleSet
 {

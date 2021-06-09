@@ -1,6 +1,5 @@
 ﻿using BepInEx;
 using System;
-using System.Xml.Schema;
 
 namespace GameruleSet
 {
