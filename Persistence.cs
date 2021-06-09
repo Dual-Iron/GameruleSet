@@ -22,6 +22,7 @@ namespace GameruleSet
         {
             this.rules = rules;
 
+            On.AbstractCreature.Die += AbstractCreature_Die;
             On.SaveState.AbstractCreatureFromString += SaveState_AbstractCreatureFromString;
             On.SaveState.AbstractCreatureToString_AbstractCreature_WorldCoordinate += SaveState_AbstractCreatureToString_AbstractCreature_WorldCoordinate;
             IL.RegionState.AdaptWorldToRegionState += RegionState_AdaptWorldToRegionState;
@@ -31,30 +32,47 @@ namespace GameruleSet
             On.RegionState.AdaptRegionStateToWorld += RegionState_AdaptRegionStateToWorld;
         }
 
+        private void AbstractCreature_Die(On.AbstractCreature.orig_Die orig, AbstractCreature self)
+        {
+            if (self.state.alive && self.world.game.session is StoryGameSession sess)
+            {
+                self.Data().Get<AbstractCreatureData>().dayDead = sess.saveState.cycleNumber;
+                Console.WriteLine(self + " died");
+            }
+            orig(self);
+        }
+
         private AbstractCreature SaveState_AbstractCreatureFromString(On.SaveState.orig_AbstractCreatureFromString orig, World world, string creatureString, bool onlyInCurrentRegion)
         {
             try
             {
-                var origRet = orig(world, creatureString, onlyInCurrentRegion);
+                var critter = orig(world, creatureString, onlyInCurrentRegion);
                 var data = creatureString.Split(new[] { "<cPOS>" }, StringSplitOptions.None);
                 if (data.Length >= 4 && rules.Persistence.Value != PersistenceEnum.None)
                 {
                     if (int.TryParse(data[1], out int x) && int.TryParse(data[2], out int y))
                     {
-                        origRet.pos.x = x;
-                        origRet.pos.y = y;
-                        origRet.InDen = data[3] == "1";
+                        critter.pos.x = x;
+                        critter.pos.y = y;
+                        critter.InDen = data[3] == "1";
                     }
                 }
+
+                if (critter.state.alive)
+                {
+                    return critter;
+                }
+
                 data = creatureString.Split(new[] { "<cDEATH>" }, StringSplitOptions.None);
                 if (data.Length >= 3 && rules.Persistence.Value != PersistenceEnum.None)
                 {
                     if (int.TryParse(data[1], out int dayDead))
                     {
-                        origRet.Data().Get<AbstractCreatureData>().dayDead = dayDead;
+                        critter.Data().Get<AbstractCreatureData>().dayDead = dayDead;
+                        Console.WriteLine(critter + " dead: " + (world.game.GetStorySession.saveState.cycleNumber - dayDead) + " days old");
                     }
                 }
-                return origRet;
+                return critter;
             }
             catch (Exception e)
             {
@@ -65,27 +83,12 @@ namespace GameruleSet
 
         private string SaveState_AbstractCreatureToString_AbstractCreature_WorldCoordinate(On.SaveState.orig_AbstractCreatureToString_AbstractCreature_WorldCoordinate orig, AbstractCreature critter, WorldCoordinate pos)
         {
-            ref var data = ref critter.Data().Get<AbstractCreatureData>();
-            if (critter.state.alive)
-            {
-                data.dayDead = -1;
-            }
-            else
-            {
-                if (data.dayDead == -1 && critter.world.game.session is StoryGameSession sess)
-                {
-                    data.dayDead = sess.saveState.cycleNumber;
-                    Console.WriteLine($"Newly dead {critter.creatureTemplate.type} {critter.ID}: {data.dayDead}");
-                }
-                else Console.WriteLine($"Oldly dead {critter.creatureTemplate.type} {critter.ID}: {data.dayDead}");
-                if (critter.Room.shelter)
-                    data.dayDead++;
-            }
+            ref var dayDead = ref critter.Data().Get<AbstractCreatureData>().dayDead;
 
             string ret = $"{orig(critter, pos)}<cC><cPOS>{pos.x}<cPOS>{pos.y}<cPOS>{(critter.InDen ? 1 : 0)}<cPOS>";
 
-            if (data.dayDead != -1)
-                ret += $"<cDEATH>{data.dayDead}<cDEATH>";
+            if (dayDead != -1)
+                ret += $"<cDEATH>{dayDead}<cDEATH>";
 
             return ret;
         }
@@ -160,22 +163,22 @@ namespace GameruleSet
                     return null;
                 }
                 // If it's dead...
-                if (critter.state.dead)
+                if (critter.state.dead || critter.creatureTemplate.offScreenSpeed == 0f)
                 {
                     // If it's in a shelter, save it accordingly
                     if (self.world.GetAbstractRoom(critter.pos).shelter)
                     {
                         return rules.SaveShelterPositions ? critter.pos : new(critter.pos.room, -1, -1, 0);
                     }
-                    // Otherwise, if it's 3 or more days old, put it back in its den
-                    if (self.saveState.cycleNumber - 3 >= critter.Data().Get<AbstractCreatureData>().dayDead)
+                    // Otherwise, if it's not dead or if it's 3 or more days old, put it back in its den
+                    if (!critter.state.dead || self.saveState.cycleNumber - 3 >= critter.Data().Get<AbstractCreatureData>().dayDead)
                     {
                         return critter.abstractAI?.denPosition;
                     }
                     // Otherwise, check if persistence applies. If so, save it!
                     Room? room = null;
                     RoomRain? rain = null;
-                    return PersistenceApplies(ref room, ref rain, self.world, critter.pos) ? critter.pos : null;
+                    return PersistenceApplies(ref room, ref rain, self.world, critter.pos) ? critter.pos : critter.abstractAI?.denPosition;
                 }
                 // If it's alive in the slugcat's shelter, save it accordingly
                 if (critter.pos.room == validSaveShelter)
