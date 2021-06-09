@@ -1,4 +1,5 @@
 ﻿using RWCustom;
+using StaticTables;
 using System;
 using System.Linq;
 using UnityEngine;
@@ -7,6 +8,23 @@ namespace GameruleSet
 {
     public class Injury
     {
+        struct PlayerData : IWeakData<AbstractCreature>
+        {
+            public int injuryCooldown;
+            public bool injured;
+            public float damageBlockedWithMask;
+            public float danger;
+            public double hunger;
+            public UnmanagedWeakRef<SlugcatStats> slugcatStats;
+
+            void IDisposable.Dispose()
+            {
+                slugcatStats.Dispose();
+            }
+
+            void IWeakData<AbstractCreature>.Initialize(AbstractCreature owner, object? state) { }
+        }
+
         private readonly Rules rules;
 
         public Injury(Rules rules)
@@ -32,9 +50,9 @@ namespace GameruleSet
 
         private void ResetInjury(RainWorldGame game)
         {
-            for (int i = 0; i < game.session.Players.Count; i++)
+            foreach (var player in game.session.Players)
             {
-                rules.GetData(game.session.Players[i].ID).injured = false;
+                player.Data().Get<PlayerData>().injured = false;
             }
         }
 
@@ -52,7 +70,7 @@ namespace GameruleSet
         {
             if (rules.Injury && obj is Player player)
             {
-                if (rules.GetData(player.abstractCreature.ID).injuryCooldown > 0)
+                if (player.abstractCreature.Data().Get<PlayerData>().injuryCooldown > 0)
                 {
                     return false;
                 }
@@ -74,8 +92,8 @@ namespace GameruleSet
             orig(self, eu);
             if (!rules.Injury)
                 return;
-            var data = rules.GetData(self.abstractCreature.ID);
-            if (data.slugcatStats?.Target != self.slugcatStats && self.slugcatStats != null)
+            ref var data = ref self.abstractCreature.Data().Get<PlayerData>();
+            if (data.slugcatStats != self.slugcatStats && self.slugcatStats != null)
             {
                 data.slugcatStats = new(self.slugcatStats);
                 if (data.injured)

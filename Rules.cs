@@ -9,8 +9,6 @@ namespace GameruleSet
     {
         internal static Rules? CurrentRules { get; private set; }
 
-        private readonly Dictionary<EntityID, EntityData> data = new();
-
         private RainWorld? rw;
         public RainWorld RW => rw ??= UnityEngine.Object.FindObjectOfType<RainWorld>();
         public RainWorldGame? RWGame => RW.processManager.currentMainLoop as RainWorldGame;
@@ -68,8 +66,5 @@ namespace GameruleSet
             new SaveShelterPositions(this);
             new SleepAnywhere(this);
         }
-
-        // TODO cleanup: replace with StaticTables
-        public EntityData GetData(EntityID entity) => data.TryGetValue(entity, out var ret) ? ret : (data[entity] = new());
     }
 }

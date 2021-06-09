@@ -81,10 +81,9 @@ namespace GameruleSet
 
         private string SaveState_AbstractCreatureToString_AbstractCreature_WorldCoordinate(On.SaveState.orig_AbstractCreatureToString_AbstractCreature_WorldCoordinate orig, AbstractCreature critter, WorldCoordinate pos)
         {
-            ref var dayDead = ref critter.Data().Get<AbstractCreatureData>().dayDead;
-
             string ret = $"{orig(critter, pos)}<cC><cPOS>{pos.x}<cPOS>{pos.y}<cPOS>{(critter.InDen ? 1 : 0)}<cPOS>";
 
+            var dayDead = critter.Data().Get<AbstractCreatureData>().dayDead;
             if (dayDead != -1)
                 ret += $"<cDEATH>{dayDead}<cDEATH>";
 
