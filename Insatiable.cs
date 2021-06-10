@@ -15,18 +15,6 @@ namespace GameruleSet
             On.Player.AddFood += Player_AddFood;
             On.Player.AddQuarterFood += Player_AddQuarterFood;
             On.Player.FoodInRoom_Room_bool += Player_FoodInRoom_Room_bool;
-
-            On.ProcessManager.SwitchMainProcess += (o, s, i) =>
-            {
-                if (s.currentMainLoop is RainWorldGame game)
-                    ResetHunger(game);
-                o(s, i);
-            };
-            On.ArenaGameSession.EndSession += (o, s) =>
-            {
-                ResetHunger(s.game);
-                o(s);
-            };
         }
 
         private void OverseerTutorialBehavior_TutorialText(On.OverseerTutorialBehavior.orig_TutorialText orig, OverseerTutorialBehavior self, string text, int wait, int time, bool hideHud)
@@ -63,14 +51,6 @@ namespace GameruleSet
             return (int)(sum * rules.Insatiable + self.FoodInStomach + self.playerState.quarterFoodPoints * 0.25);
         }
 
-        private void ResetHunger(RainWorldGame game)
-        {
-            foreach (var abstractPlayer in game.session.Players)
-            {
-                abstractPlayer.Data().Get<PlayerData>().hunger = 0;
-            }
-        }
-
         private void FoodMeter_ctor(On.HUD.FoodMeter.orig_ctor orig, HUD.FoodMeter self, HUD.HUD hud, int maxFood, int survivalLimit)
         {
             orig(self, hud, maxFood, survivalLimit);
@@ -97,7 +77,7 @@ namespace GameruleSet
 
         private void AddFood(Player player, double amount)
         {
-            ref var data = ref player.abstractCreature.Data().Get<PlayerData>();
+            ref var data = ref player.playerState.Data().Get<PlayerData>();
 
             amount += data.hunger;
 

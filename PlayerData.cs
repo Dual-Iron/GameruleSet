@@ -3,20 +3,18 @@ using System;
 
 namespace GameruleSet
 {
-    internal struct PlayerData : IWeakData<AbstractCreature>
+    internal struct PlayerData : IWeakData<PlayerState>
     {
         public int injuryCooldown;
         public bool injured;
         public float damageBlockedWithMask;
         public float danger;
         public double hunger;
-        public ValueWeakRef<SlugcatStats> cachedSlugcatStats;
+        public SlugcatStats cachedSlugcatStats;
+        public int painTime;
+        public float lastAerobicLevel;
 
-        void IDisposable.Dispose()
-        {
-            cachedSlugcatStats.Dispose();
-        }
-
-        void IWeakData<AbstractCreature>.Initialize(AbstractCreature owner, object? state) { }
+        void IDisposable.Dispose() { }
+        void IWeakData<PlayerState>.Initialize(PlayerState owner, object? state) { }
     }
 }

@@ -1,4 +1,5 @@
 ﻿using StaticTables;
+using System;
 using UnityEngine;
 
 namespace GameruleSet
@@ -11,29 +12,21 @@ namespace GameruleSet
         {
             this.rules = rules;
 
-            On.ProcessManager.SwitchMainProcess += (o, s, i) =>
-            {
-                if (s.currentMainLoop is RainWorldGame game)
-                    ResetInjury(game);
-                o(s, i);
-            };
-            On.ArenaGameSession.EndSession += (o, s) =>
-            {
-                ResetInjury(s.game);
-                o(s);
-            };
             On.Creature.Grab += Creature_Grab;
             On.Creature.Violence += Creature_Violence;
             On.Creature.SpearStick += Creature_SpearStick;
             On.Player.Update += Player_Update;
+            On.Player.Stun += Player_Stun;
         }
 
-        private void ResetInjury(RainWorldGame game)
+        private void Player_Stun(On.Player.orig_Stun orig, Player self, int st)
         {
-            foreach (var player in game.session.Players)
+            if (rules.Injury && self.playerState.Data().Get<PlayerData>().injured)
             {
-                player.Data().Get<PlayerData>().injured = false;
+                self.AerobicIncrease(st / 15f);
+                st = (int)(st * 1.5f);
             }
+            orig(self, st);
         }
 
         private VultureMask? GetGraspedMask(Player player)
@@ -50,7 +43,7 @@ namespace GameruleSet
         {
             if (rules.Injury && obj is Player player)
             {
-                if (player.abstractCreature.Data().Get<PlayerData>().injuryCooldown > 0)
+                if (player.playerState.Data().Get<PlayerData>().injuryCooldown > 0)
                 {
                     return false;
                 }
@@ -69,29 +62,59 @@ namespace GameruleSet
 
         private void Player_Update(On.Player.orig_Update orig, Player self, bool eu)
         {
-            orig(self, eu);
-
             if (!rules.Injury)
-                return;
-
-            ref var data = ref self.abstractCreature.Data().Get<PlayerData>();
-
-            if (self.slugcatStats != null && data.cachedSlugcatStats != self.slugcatStats)
             {
-                data.cachedSlugcatStats.Value = self.slugcatStats;
-                if (data.injured)
-                {
-                    self.slugcatStats.bodyWeightFac *= 0.9f;
-                    self.slugcatStats.runspeedFac *= 0.875f;
-                    self.slugcatStats.throwingSkill = 0;
-                    self.slugcatStats.poleClimbSpeedFac *= 0.8f;
-                    self.slugcatStats.corridorClimbSpeedFac *= 0.86f;
-                    self.slugcatStats.malnourished = true;
-
-                    self.bodyChunks[0].mass = 0.35f * self.slugcatStats.bodyWeightFac;
-                    self.bodyChunks[1].mass = 0.35f * self.slugcatStats.bodyWeightFac;
-                }
+                orig(self, eu);
+                return;
             }
+
+            ref var data = ref self.playerState.Data().Get<PlayerData>();
+
+            if (data.injured)
+            {
+                const int maxPainTime = 120;
+
+                // Aerobic level decreases 50% slower
+                if (self.aerobicLevel < data.lastAerobicLevel)
+                    self.aerobicLevel -= (self.aerobicLevel - data.lastAerobicLevel) / 3;
+
+                data.lastAerobicLevel = self.aerobicLevel;
+
+                // If exhausted, experience pain
+                if (self.aerobicLevel >= 1)
+                {
+                    self.aerobicLevel = 1;
+                    data.painTime = maxPainTime;
+                    self.Stun(80);
+                }
+
+                // Tired
+                if (self.aerobicLevel >= 0.85f)
+                    self.standing = false;
+
+                // Forewarn pain
+                if (self.aerobicLevel >= 0.65f)
+                    self.Blink(5);
+
+                // Effects of pain
+                if (data.painTime > 0)
+                {
+                    self.standing = false;
+                    self.slowMovementStun = Math.Max(self.slowMovementStun, 2 + (int)(6f * data.painTime / maxPainTime));
+
+                    self.Blink(5);
+
+                    if (self.aerobicLevel < 0.4f)
+                        data.painTime--;
+
+                    if (self.graphicsModule is PlayerGraphics g)
+                        g.breath += 0.02f;
+                }
+
+                self.slowMovementStun = Math.Max(self.slowMovementStun, (int)(6 * self.aerobicLevel));
+            }
+
+            orig(self, eu);
 
             if (data.damageBlockedWithMask > 0)
             {
@@ -130,9 +153,10 @@ namespace GameruleSet
 
         private void Creature_Violence(On.Creature.orig_Violence orig, Creature self, BodyChunk source, Vector2? directionAndMomentum, BodyChunk hitChunk, PhysicalObject.Appendage.Pos hitAppendage, Creature.DamageType type, float damage, float stunBonus)
         {
+            Console.WriteLine(damage);
             if (rules.Injury && self is Player player && damage >= self.Template.instantDeathDamageLimit)
             {
-                ref var data = ref player.abstractCreature.Data().Get<PlayerData>();
+                ref var data = ref player.playerState.Data().Get<PlayerData>();
                 if (hitChunk.index == 0 && type != Creature.DamageType.Electric && type != Creature.DamageType.Explosion)
                 {
                     var mask = GetGraspedMask(player);
@@ -147,6 +171,10 @@ namespace GameruleSet
                 }
                 else
                 {
+                    // Adrenaline surge!
+                    player.AerobicIncrease(-9);
+
+                    // Oh shit
                     if (data.injuryCooldown > 0)
                     {
                         stunBonus += damage * 30;
@@ -158,8 +186,6 @@ namespace GameruleSet
                         data.injuryCooldown = 10;
                         stunBonus += damage * 30;
                         damage = 0;
-
-                        player.abstractCreature.world.game.session.characterStats = new SlugcatStats(player.abstractCreature.world.game.StoryCharacter, false);
                     }
                 }
             }

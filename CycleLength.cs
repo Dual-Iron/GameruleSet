@@ -2,7 +2,7 @@
 {
     public class CycleLength
     {
-        private Rules rules;
+        private readonly Rules rules;
 
         public CycleLength(Rules rules)
         {
