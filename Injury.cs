@@ -1,4 +1,6 @@
-﻿using RWCustom;
+﻿using Mono.Cecil.Cil;
+using MonoMod.Cil;
+using RWCustom;
 using StaticTables;
 using System;
 using UnityEngine;
@@ -15,6 +17,7 @@ namespace GameruleSet
         {
             this.rules = rules;
 
+            On.PlayerGraphics.Update += PlayerGraphics_Update; ;
             On.Player.Die += Player_Die;
             On.Player.TerrainImpact += Player_TerrainImpact;
             On.Creature.Grab += Creature_Grab;
@@ -22,6 +25,21 @@ namespace GameruleSet
             On.Creature.SpearStick += Creature_SpearStick;
             On.Player.Update += Player_Update;
             On.Player.Stun += Player_Stun;
+        }
+
+        private void PlayerGraphics_Update(On.PlayerGraphics.orig_Update orig, PlayerGraphics self)
+        {
+            orig(self);
+            if (rules.Injury)
+            {
+                var data = self.player.playerState.Data().Get<PlayerData>();
+                if (data.injured)
+                {
+                    if (self.malnourished < 1)
+                        self.malnourished += 0.01f;
+                    self.breath += 1 / 50f;
+                }
+            }
         }
 
         private void Player_Die(On.Player.orig_Die orig, Player self)
@@ -120,9 +138,8 @@ namespace GameruleSet
                 data.lastAerobicLevel = self.aerobicLevel;
 
                 // If exhausted, experience pain
-                if (self.aerobicLevel >= 1)
+                if (self.aerobicLevel >= 1 || self.aerobicLevel >= 0.9 && self.Malnourished)
                 {
-                    self.aerobicLevel = 1f;
                     data.painTime = maxPainTime;
                     self.Stun(80);
 
@@ -161,9 +178,6 @@ namespace GameruleSet
                             self.Blink(5);
                     }
                     else self.Blink(5);
-
-                    if (self.graphicsModule is PlayerGraphics g)
-                        g.breath += 0.02f;
                 }
 
                 self.slowMovementStun = Math.Max(self.slowMovementStun, (int)(6 * self.aerobicLevel));
