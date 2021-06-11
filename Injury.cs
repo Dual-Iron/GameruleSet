@@ -1,4 +1,5 @@
-﻿using StaticTables;
+﻿using RWCustom;
+using StaticTables;
 using System;
 using UnityEngine;
 
@@ -8,15 +9,53 @@ namespace GameruleSet
     {
         private readonly Rules rules;
 
+        private Action? replaceDeath;
+
         public Injury(Rules rules)
         {
             this.rules = rules;
 
+            On.Player.Die += Player_Die;
+            On.Player.TerrainImpact += Player_TerrainImpact;
             On.Creature.Grab += Creature_Grab;
             On.Creature.Violence += Creature_Violence;
             On.Creature.SpearStick += Creature_SpearStick;
             On.Player.Update += Player_Update;
             On.Player.Stun += Player_Stun;
+        }
+
+        private void Player_Die(On.Player.orig_Die orig, Player self)
+        {
+            if (replaceDeath != null)
+            {
+                Action a = replaceDeath;
+                replaceDeath = null;
+                a();
+            }
+            else
+            {
+                orig(self);
+            }
+        }
+
+        private void Player_TerrainImpact(On.Player.orig_TerrainImpact orig, Player self, int chunk, IntVector2 direction, float speed, bool firstContact)
+        {
+            if (!rules.Injury)
+            {
+                orig(self, chunk, direction, speed, firstContact);
+                return;
+            }
+
+            void ApplyDamageFromFalling()
+            {
+                int stun = (int)Custom.LerpMap(speed, 35f, 60f, 40f, 140f, 2.5f);
+                float damage = self.Template.instantDeathDamageLimit * speed / 60;
+                self.Violence(null, null, self.bodyChunks[chunk], null, Creature.DamageType.Blunt, damage, stun);
+            }
+
+            replaceDeath = ApplyDamageFromFalling;
+            orig(self, chunk, direction, speed, firstContact);
+            replaceDeath = null;
         }
 
         private void Player_Stun(On.Player.orig_Stun orig, Player self, int st)
@@ -70,42 +109,58 @@ namespace GameruleSet
 
             ref var data = ref self.playerState.Data().Get<PlayerData>();
 
-            if (data.injured)
+            if (data.injured && self.State.alive)
             {
                 const int maxPainTime = 120;
 
-                // Aerobic level decreases 50% slower
+                // Aerobic level decreases 33% slower
                 if (self.aerobicLevel < data.lastAerobicLevel)
-                    self.aerobicLevel -= (self.aerobicLevel - data.lastAerobicLevel) / 3;
+                    self.aerobicLevel -= (self.aerobicLevel - data.lastAerobicLevel) / (2f - 0.5f * data.woundIntensity);
 
                 data.lastAerobicLevel = self.aerobicLevel;
 
                 // If exhausted, experience pain
                 if (self.aerobicLevel >= 1)
                 {
-                    self.aerobicLevel = 1;
+                    self.aerobicLevel = 1f;
                     data.painTime = maxPainTime;
                     self.Stun(80);
+
+                    // Visuals
+                    self.room.PlaySound(SoundID.Slugcat_Swallow_Item, self.mainBodyChunk.pos, 1.25f, 2.5f);
+
+                    for (int i = 0; i < 4 + (int)(5 * data.woundIntensity); i++)
+                    {
+                        var dir = -data.woundDir + UnityEngine.Random.value * 30 - 15 + self.bodyChunks[1].Rotation.GetAngle();
+                        var pos = self.bodyChunks[1].pos + Custom.DegToVec(dir) * self.bodyChunks[1].rad * UnityEngine.Random.value;
+                        var direction = Custom.DegToVec(dir);
+                        var speed = 7 + UnityEngine.Random.value * data.woundIntensity * 7;
+                        self.room.AddObject(new WaterDrip(pos, direction * speed, false));
+                    }
                 }
 
-                // Tired
+                // Forewarn pain
+                if (self.aerobicLevel >= 0.68f)
+                    self.Blink(2);
+
+                // Twinge of pain
                 if (self.aerobicLevel >= 0.85f)
                     self.standing = false;
 
-                // Forewarn pain
-                if (self.aerobicLevel >= 0.65f)
-                    self.Blink(5);
-
-                // Effects of pain
+                // Agony
                 if (data.painTime > 0)
                 {
                     self.standing = false;
                     self.slowMovementStun = Math.Max(self.slowMovementStun, 2 + (int)(6f * data.painTime / maxPainTime));
 
-                    self.Blink(5);
-
                     if (self.aerobicLevel < 0.4f)
+                    {
                         data.painTime--;
+
+                        if (UnityEngine.Random.value < 0.18)
+                            self.Blink(5);
+                    }
+                    else self.Blink(5);
 
                     if (self.graphicsModule is PlayerGraphics g)
                         g.breath += 0.02f;
@@ -153,11 +208,10 @@ namespace GameruleSet
 
         private void Creature_Violence(On.Creature.orig_Violence orig, Creature self, BodyChunk source, Vector2? directionAndMomentum, BodyChunk hitChunk, PhysicalObject.Appendage.Pos hitAppendage, Creature.DamageType type, float damage, float stunBonus)
         {
-            Console.WriteLine(damage);
             if (rules.Injury && self is Player player && damage >= self.Template.instantDeathDamageLimit)
             {
                 ref var data = ref player.playerState.Data().Get<PlayerData>();
-                if (hitChunk.index == 0 && type != Creature.DamageType.Electric && type != Creature.DamageType.Explosion)
+                if (hitChunk.index == 0 && (type == Creature.DamageType.Stab || type == Creature.DamageType.Blunt))
                 {
                     var mask = GetGraspedMask(player);
                     if (mask != null)
@@ -182,6 +236,8 @@ namespace GameruleSet
                     }
                     else if (!data.injured && !player.Malnourished)
                     {
+                        data.woundIntensity = Math.Min(1, (damage - self.Template.instantDeathDamageLimit) / self.Template.instantDeathDamageLimit);
+                        data.woundDir = (directionAndMomentum?.GetAngle() ?? (UnityEngine.Random.value * 360)) - player.bodyChunks[1].Rotation.GetAngle();
                         data.injured = true;
                         data.injuryCooldown = 10;
                         stunBonus += damage * 30;

@@ -33,7 +33,7 @@ namespace GameruleSet
             Injury = new BoolRule(false)
             {
                 ID = "injury",
-                Description = "When your body takes lethal damage while not already injured, you survive and become injured until you sleep. Vulture masks prevent being killed by headshots, and king vulture masks prevent being stunned from headshots."
+                Description = "While healthy, if you suffer a critical injury, you survive and become injured until you sleep. Headshots are still lethal unless you're holding a vulture mask. King vulture masks are even safer."
             };
 
             Imbalanced = new BoolRule(false) { ID = "karmically_imbalanced", Description = "Karma flowers don't spawn." };
