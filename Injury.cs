@@ -133,7 +133,7 @@ namespace GameruleSet
 
                 // Aerobic level decreases 33% slower
                 if (self.aerobicLevel < data.lastAerobicLevel)
-                    self.aerobicLevel -= (self.aerobicLevel - data.lastAerobicLevel) / (2f - 0.5f * data.woundIntensity);
+                    self.aerobicLevel -= (self.aerobicLevel - data.lastAerobicLevel) / 3f;
 
                 data.lastAerobicLevel = self.aerobicLevel;
 
