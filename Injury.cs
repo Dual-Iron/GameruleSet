@@ -30,7 +30,7 @@ namespace GameruleSet
         private void PlayerGraphics_Update(On.PlayerGraphics.orig_Update orig, PlayerGraphics self)
         {
             orig(self);
-            if (rules.Injury)
+            if (rules.Injury && !self.player.dead)
             {
                 var data = self.player.playerState.Data().Get<PlayerData>();
                 if (data.injured)
