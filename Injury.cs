@@ -39,6 +39,11 @@ namespace GameruleSet
                         self.malnourished += 0.01f;
                     self.breath += 1 / 50f;
                 }
+
+                if (data.painTime > 0 || self.player.aerobicLevel >= 0.68f)
+                {
+                    self.LookAtNothing();
+                }
             }
         }
 
