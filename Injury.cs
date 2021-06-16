@@ -17,7 +17,7 @@ namespace GameruleSet
         {
             this.rules = rules;
 
-            On.PlayerGraphics.Update += PlayerGraphics_Update; ;
+            On.PlayerGraphics.Update += PlayerGraphics_Update;
             On.Player.Die += Player_Die;
             On.Player.TerrainImpact += Player_TerrainImpact;
             On.Creature.Grab += Creature_Grab;
@@ -29,20 +29,33 @@ namespace GameruleSet
 
         private void PlayerGraphics_Update(On.PlayerGraphics.orig_Update orig, PlayerGraphics self)
         {
-            orig(self);
-            if (rules.Injury && !self.player.dead)
+            if (!rules.Injury || self.player.dead)
             {
+                orig(self);
+            }
+            else
+            {
+                orig(self);
+
                 var data = self.player.playerState.Data().Get<PlayerData>();
                 if (data.injured)
                 {
                     if (self.malnourished < 1)
                         self.malnourished += 0.01f;
-                    self.breath += 1 / 50f;
-                }
 
-                if (data.painTime > 0 || self.player.aerobicLevel >= 0.68f)
-                {
-                    self.LookAtNothing();
+                    if (data.painTime > 0 || self.player.aerobicLevel >= 0.68f)
+                    {
+                        self.LookAtNothing();
+                    }
+
+                    self.breath += 1 / 50f;
+                    self.player.swimCycle += 0.05f * self.player.aerobicLevel;
+
+                    if (!self.player.Stunned)
+                    {
+                        self.head.vel.y += Mathf.Sin(self.player.swimCycle * Mathf.PI * 2) * 0.25f;
+                        self.drawPositions[0, 0].y += Mathf.Sin(self.player.swimCycle * Mathf.PI * 2f) * 0.75f;
+                    }
                 }
             }
         }
@@ -71,8 +84,8 @@ namespace GameruleSet
 
             void ApplyDamageFromFalling()
             {
-                int stun = (int)Custom.LerpMap(speed, 35f, 60f, 40f, 140f, 2.5f);
-                float damage = self.Template.instantDeathDamageLimit * speed / 60;
+                var stun = (int)Custom.LerpMap(speed, 35f, 60f, 40f, 140f, 2.5f);
+                var damage = self.Template.instantDeathDamageLimit * speed / 60;
                 self.Violence(null, null, self.bodyChunks[chunk], null, Creature.DamageType.Blunt, damage, stun);
             }
 
@@ -114,6 +127,7 @@ namespace GameruleSet
                     var mask = GetGraspedMask(player);
                     if (mask != null)
                     {
+                        VulturePopEffect(obj.room, null, obj.bodyChunks[chunkGrabbed].pos, 0.1f, pacifying ? 45f : 0f);
                         mask.AllGraspsLetGoOfThisObject(true);
                         obj = mask;
                     }
@@ -149,14 +163,14 @@ namespace GameruleSet
                     self.Stun(80);
 
                     // Visuals
-                    self.room.PlaySound(SoundID.Slugcat_Swallow_Item, self.mainBodyChunk.pos, 1.25f, 2.5f);
+                    self.room.PlaySound(SoundID.Slugcat_Swallow_Item, self.mainBodyChunk.pos, 1.25f, 2.2f);
 
-                    for (int i = 0; i < 4 + (int)(5 * data.woundIntensity); i++)
+                    for (int i = 0; i < 4; i++)
                     {
-                        var dir = -data.woundDir + UnityEngine.Random.value * 30 - 15 + self.bodyChunks[1].Rotation.GetAngle();
-                        var pos = self.bodyChunks[1].pos + Custom.DegToVec(dir) * self.bodyChunks[1].rad * UnityEngine.Random.value;
+                        var dir = self.bodyChunks[1].Rotation.GetAngle() + data.woundDir - 90 + UnityEngine.Random.value * 30 - 15;
+                        var pos = self.bodyChunks[1].pos + Custom.DegToVec(dir) * self.bodyChunks[1].rad * 0.75f;
                         var direction = Custom.DegToVec(dir);
-                        var speed = 7 + UnityEngine.Random.value * data.woundIntensity * 7;
+                        var speed = 5 + UnityEngine.Random.value * 7;
                         self.room.AddObject(new WaterDrip(pos, direction * speed, false));
                     }
                 }
@@ -227,7 +241,7 @@ namespace GameruleSet
 
         private void Creature_Violence(On.Creature.orig_Violence orig, Creature self, BodyChunk source, Vector2? directionAndMomentum, BodyChunk hitChunk, PhysicalObject.Appendage.Pos hitAppendage, Creature.DamageType type, float damage, float stunBonus)
         {
-            if (rules.Injury && self is Player player && damage >= self.Template.instantDeathDamageLimit)
+            if (rules.Injury && self is Player player)
             {
                 ref var data = ref player.playerState.Data().Get<PlayerData>();
                 if (hitChunk.index == 0 && (type == Creature.DamageType.Stab || type == Creature.DamageType.Blunt))
@@ -235,14 +249,17 @@ namespace GameruleSet
                     var mask = GetGraspedMask(player);
                     if (mask != null)
                     {
+                        VulturePopEffect(player.room, source?.pos, hitChunk.pos, damage, stunBonus);
                         if (!mask.King)
-                            data.damageBlockedWithMask = damage;
+                            data.damageBlockedWithMask = damage + stunBonus / 45f;
+                        else
+                            data.damageBlockedWithMask = stunBonus / 90f;
                         mask.donned = 1f;
                         stunBonus = 0;
                         damage = 0;
                     }
                 }
-                else
+                else if (damage >= self.Template.instantDeathDamageLimit)
                 {
                     // Adrenaline surge!
                     player.AerobicIncrease(-9);
@@ -255,7 +272,6 @@ namespace GameruleSet
                     }
                     else if (!data.injured && !player.Malnourished)
                     {
-                        data.woundIntensity = Math.Min(1, (damage - self.Template.instantDeathDamageLimit) / self.Template.instantDeathDamageLimit);
                         data.woundDir = (directionAndMomentum?.GetAngle() ?? (UnityEngine.Random.value * 360)) - player.bodyChunks[1].Rotation.GetAngle();
                         data.injured = true;
                         data.injuryCooldown = 10;
@@ -265,6 +281,19 @@ namespace GameruleSet
                 }
             }
             orig(self, source, directionAndMomentum, hitChunk, hitAppendage, type, damage, stunBonus);
+        }
+
+        private void VulturePopEffect(Room room, Vector2? sourcePos, Vector2 hitPos, float damage, float stunBonus)
+        {
+            Vector2 pos = (sourcePos == null) ? hitPos : (hitPos + sourcePos.Value) / 2;
+            if (damage > 0.1f || stunBonus > 30f)
+            {
+                room.AddObject(new StationaryEffect(pos, new Color(1f, 1f, 1f), null, StationaryEffect.EffectType.FlashingOrb));
+                for (int i = 0; i < 3 + (int)Mathf.Min(damage * 3f, 9f); i++)
+                {
+                    room.AddObject(new Spark(pos, Custom.RNV() * UnityEngine.Random.value * 12f, new Color(1f, 1f, 1f), null, 6, 16));
+                }
+            }
         }
     }
 }
