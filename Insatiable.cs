@@ -14,6 +14,7 @@ namespace GameruleSet
             On.HUD.FoodMeter.ctor += FoodMeter_ctor;
             On.Player.AddFood += Player_AddFood;
             On.Player.AddQuarterFood += Player_AddQuarterFood;
+            On.Player.FoodInRoom_bool += Player_FoodInRoom_bool;
             On.Player.FoodInRoom_Room_bool += Player_FoodInRoom_Room_bool;
         }
 
@@ -45,10 +46,19 @@ namespace GameruleSet
             orig(self, text, wait, time, hideHud);
         }
 
+        private int Player_FoodInRoom_bool(On.Player.orig_FoodInRoom_bool orig, Player self, bool eatAndDestroy)
+        {
+            return self.FoodInRoom(self.room, eatAndDestroy);
+        }
+
         private int Player_FoodInRoom_Room_bool(On.Player.orig_FoodInRoom_Room_bool orig, Player self, Room checkRoom, bool eatAndDestroy)
         {
+            if (!checkRoom.abstractRoom.shelter)
+            {
+                return self.FoodInStomach;
+            }
             int sum = orig(self, checkRoom, eatAndDestroy) - self.FoodInStomach;
-            return (int)(sum * rules.Insatiable + self.FoodInStomach + self.playerState.quarterFoodPoints * 0.25);
+            return (int)(sum * rules.Insatiable + self.FoodInStomach + self.playerState.quarterFoodPoints * 0.25f);
         }
 
         private void FoodMeter_ctor(On.HUD.FoodMeter.orig_ctor orig, HUD.FoodMeter self, HUD.HUD hud, int maxFood, int survivalLimit)
