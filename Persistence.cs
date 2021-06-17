@@ -2,6 +2,7 @@
 using MonoMod.Cil;
 using StaticTables;
 using System;
+using System.Diagnostics;
 using System.IO;
 
 namespace GameruleSet
@@ -10,9 +11,14 @@ namespace GameruleSet
     {
         struct AbstractCreatureData : IWeakData<AbstractCreature>
         {
+            public const int defaultDayDead = int.MinValue;
             public int dayDead;
+
             void IDisposable.Dispose() { }
-            void IWeakData<AbstractCreature>.Initialize(AbstractCreature owner, object? state) => dayDead = -1;
+            void IWeakData<AbstractCreature>.Initialize(AbstractCreature owner, object? state)
+            {
+                dayDead = defaultDayDead;
+            }
         }
 
         private readonly Rules rules;
@@ -46,13 +52,12 @@ namespace GameruleSet
             {
                 var critter = orig(world, creatureString, onlyInCurrentRegion);
                 var data = creatureString.Split(new[] { "<cPOS>" }, StringSplitOptions.None);
-                if (data.Length >= 4 && rules.Persistence.Value != PersistenceEnum.None)
+                if (data.Length >= 3 && rules.Persistence.Value != PersistenceEnum.None)
                 {
                     if (int.TryParse(data[1], out int x) && int.TryParse(data[2], out int y))
                     {
                         critter.pos.x = x;
                         critter.pos.y = y;
-                        critter.InDen = data[3] == "1";
                     }
                 }
 
@@ -80,10 +85,10 @@ namespace GameruleSet
 
         private string SaveState_AbstractCreatureToString_AbstractCreature_WorldCoordinate(On.SaveState.orig_AbstractCreatureToString_AbstractCreature_WorldCoordinate orig, AbstractCreature critter, WorldCoordinate pos)
         {
-            string ret = $"{orig(critter, pos)}<cC><cPOS>{pos.x}<cPOS>{pos.y}<cPOS>{(critter.InDen ? 1 : 0)}<cPOS>";
+            string ret = $"{orig(critter, pos)}<cC><cPOS>{pos.x}<cPOS>{pos.y}<cPOS>";
 
             var dayDead = critter.Data().Get<AbstractCreatureData>().dayDead;
-            if (dayDead != -1)
+            if (dayDead != AbstractCreatureData.defaultDayDead)
                 ret += $"<cDEATH>{dayDead}<cDEATH>";
 
             return ret;
@@ -115,17 +120,7 @@ namespace GameruleSet
 
                 static bool CanLoadPosition(AbstractCreature c)
                 {
-                    // Don't set pos of pole mimic or tentacle plant
-                    if (c.creatureTemplate.offScreenSpeed == 0)
-                    {
-                        return false;
-                    }
-                    // Don't set pos of a creature that's disposed of
-                    if (c.InDen || c.Room.offScreenDen || c.pos.x == -1 || c.pos.y == -1)
-                    {
-                        return false;
-                    }
-                    return true;
+                    return c.pos.x >= 0 && c.pos.y >= 0;
                 }
             }
             catch (Exception e)
@@ -138,9 +133,15 @@ namespace GameruleSet
         {
             try
             {
+                if (rules.Persistence.Value == PersistenceEnum.None && !rules.SaveShelterPositions)
+                {
+                    return orig(self, critter, validSaveShelter, activeGate);
+                }
+
                 var pos = GetPos(self, critter, validSaveShelter, activeGate);
                 if (pos == null || !self.world.IsRoomInRegion(pos.Value.room))
                 {
+                    UnityEngine.Debug.Log($"[GameruleSet] Did not save creature. type: {critter.creatureTemplate.type}, id: {critter.ID}, state: {critter.state}, pos: {critter.pos}, w: {self.world.firstRoomIndex}-{self.world.firstRoomIndex + self.world.NumberOfRooms}");
                     return string.Empty;
                 }
                 return SaveState.AbstractCreatureToString(critter, pos.Value);
@@ -158,31 +159,39 @@ namespace GameruleSet
                 {
                     return null;
                 }
-                // If it's dead...
-                if (critter.state.dead || critter.creatureTemplate.offScreenSpeed == 0f)
+
+                // If it's dead or unmoving and in a shelter, save it...
+                if ((critter.state.dead || critter.creatureTemplate.offScreenSpeed == 0f) && self.world.GetAbstractRoom(critter.pos).shelter)
                 {
-                    // If it's in a shelter, save it accordingly
-                    if (self.world.GetAbstractRoom(critter.pos).shelter)
-                    {
-                        return rules.SaveShelterPositions ? critter.pos : new(critter.pos.room, -1, -1, 0);
-                    }
-                    // Otherwise, if it's not dead or if it's 3 or more days old, put it back in its den
-                    if (!critter.state.dead || self.saveState.cycleNumber - 3 >= critter.Data().Get<AbstractCreatureData>().dayDead)
-                    {
-                        return critter.abstractAI?.denPosition;
-                    }
-                    // Otherwise, check if persistence applies. If so, save it!
+                    return rules.SaveShelterPositions ? critter.pos : new(critter.pos.room, -1, -1, 0);
+                }
+
+                // It should return if dead, not eaten, not in a den, and less than 3 days old
+                if (critter.state.dead && critter.state.meatLeft > 0 && !critter.InDen && !critter.Room.offScreenDen &&
+                    critter.Data().Get<AbstractCreatureData>().dayDead + 3 > self.saveState.cycleNumber)
+                {
+                    // Check if persistence applies. If so, save it!
                     Room? room = null;
                     RoomRain? rain = null;
                     return PersistenceApplies(ref room, ref rain, self.world, critter.pos) ? critter.pos : critter.abstractAI?.denPosition;
                 }
+
                 // If it's alive in the slugcat's shelter, save it accordingly
                 if (critter.pos.room == validSaveShelter)
                 {
                     return rules.SaveShelterPositions ? critter.pos : new(critter.pos.room, -1, -1, 0);
                 }
-                // Alive somewhere other than player's den, so put it back in its own den.
-                return critter.abstractAI?.denPosition;
+
+                // Alive somewhere other than player's den, so put it back at its own den.
+                var pos = critter.abstractAI?.denPosition;
+                if (pos != null && self.world.IsRoomInRegion(pos.Value.room))
+                    return pos;
+
+                // Make sure it's in the region.
+                if (self.world.IsRoomInRegion(critter.spawnDen.room))
+                    return critter.spawnDen;
+
+                return null;
             }
         }
 
@@ -197,7 +206,7 @@ namespace GameruleSet
             for (int i = 0; i < self.world.NumberOfRooms; i++)
             {
                 var abstractRoom = self.world.GetAbstractRoom(self.world.firstRoomIndex + i);
-                if (abstractRoom.shelter)
+                if (abstractRoom.shelter || abstractRoom.offScreenDen)
                     continue;
 
                 // Cache these values to maximize lazy loading
@@ -206,7 +215,14 @@ namespace GameruleSet
 
                 for (int j = 0; j < abstractRoom.entities.Count; j++)
                 {
-                    if (abstractRoom.entities[j] is AbstractPhysicalObject o && o.type != AbstractPhysicalObject.AbstractObjectType.Creature && o.type != AbstractPhysicalObject.AbstractObjectType.KarmaFlower && o.type != AbstractPhysicalObject.AbstractObjectType.Rock && (o.type != AbstractPhysicalObject.AbstractObjectType.Spear || o is AbstractSpear s && s.explosive) && (o is not AbstractConsumable c || c.isConsumed))
+                    if (abstractRoom.entities[j] is AbstractPhysicalObject o && 
+                        o.pos.x >= 0 && o.pos.x <= abstractRoom.size.x && 
+                        o.pos.y >= 0 && o.pos.y <= abstractRoom.size.y &&
+                        o.type != AbstractPhysicalObject.AbstractObjectType.Creature && 
+                        o.type != AbstractPhysicalObject.AbstractObjectType.KarmaFlower && 
+                        o.type != AbstractPhysicalObject.AbstractObjectType.Rock && 
+                        o.GetType() != typeof(Spear) && 
+                        (o is not AbstractConsumable c || c.isConsumed && AbstractConsumable.IsTypeConsumable(o.type)))
                     {
                         if (PersistenceApplies(ref room, ref rain, self.world, o.pos))
                         {
