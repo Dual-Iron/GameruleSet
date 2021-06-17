@@ -3,7 +3,6 @@ using StaticTables;
 using System;
 using System.Linq;
 using UnityEngine;
-using static CreatureTemplate.Relationship.Type;
 
 namespace GameruleSet
 {
@@ -11,7 +10,7 @@ namespace GameruleSet
     {
         const int startCurl = 120;
         const int startSleeping = 300;
-        const int maxSleeping = startSleeping + 400;
+        const int maxSleeping = startSleeping + 200;
 
         struct SleepData : IWeakData<Player>
         {
@@ -28,7 +27,6 @@ namespace GameruleSet
         {
             this.rules = rules;
 
-            On.Player.ctor += Player_ctor;
             On.Player.Stun += Player_Stun;
             On.Player.Update += Player_Update;
             On.Player.checkInput += Player_checkInput;
@@ -37,23 +35,6 @@ namespace GameruleSet
 
             new Hook(typeof(VirtualMicrophone).GetMethod("get_InWorldSoundsVolumeGoal"), (Func<Func<VirtualMicrophone, float>, VirtualMicrophone, float>)GetterInWorldSoundsVolumeGoal)
                 .Apply();
-        }
-
-        private void Player_ctor(On.Player.orig_ctor orig, Player self, AbstractCreature abstractCreature, World world)
-        {
-            orig(self, abstractCreature, world);
-            if (rules.SleepAnywhere && world.game.IsStorySession)
-            {
-                var abstractRoom = world.GetAbstractRoom(abstractCreature.pos.room);
-                if (abstractRoom.creatures.Any(c =>
-                {
-                    var rel = c.creatureTemplate.CreatureRelationship(abstractCreature.creatureTemplate).type;
-                    return rel == AgressiveRival || rel == Antagonizes || rel == Attacks || rel == Eats || rel == Uncomfortable;
-                }))
-                    self.sleepCounter = 0;
-                else
-                    self.sleepCounter = 100;
-            }
         }
 
         private float GetterInWorldSoundsVolumeGoal(Func<VirtualMicrophone, float> orig, VirtualMicrophone self)
@@ -73,8 +54,7 @@ namespace GameruleSet
         {
             if (self.Data().Get<SleepData>().sleepingFor >= startSleeping)
             {
-                st *= 2;
-                st += 160;
+                st += 60;
             }
             orig(self, st);
         }
@@ -207,7 +187,7 @@ namespace GameruleSet
 
             var world = self.abstractCreature.world;
             int global = GetGlobalSleepingFor(world.game);
-            if (global >= maxSleeping && world.rainCycle.TimeUntilRain < -400)
+            if (global >= maxSleeping && world.rainCycle.TimeUntilRain < -1200)
             {
                 int foodInStomach = world.game.Players.Max(a => a?.realizedCreature is Player p ? p.playerState.foodInStomach : 0);
                 int foodToHibernate = world.game.Players.Max(a => a?.realizedCreature is Player p ? p.slugcatStats.foodToHibernate : 0);
