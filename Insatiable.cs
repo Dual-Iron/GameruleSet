@@ -57,8 +57,113 @@ namespace GameruleSet
             {
                 return self.FoodInStomach;
             }
-            int sum = orig(self, checkRoom, eatAndDestroy) - self.FoodInStomach;
-            return (int)(sum * rules.Insatiable + self.FoodInStomach + self.playerState.quarterFoodPoints * 0.25f);
+
+            if (rules.Insatiable == 1)
+            {
+                return orig(self, checkRoom, eatAndDestroy);
+            }
+
+            var sum = orig(self, checkRoom, false) - self.FoodInStomach;
+            var ret = (int)(sum * rules.Insatiable + self.FoodInStomach + self.playerState.quarterFoodPoints * 0.25f);
+
+            // If you're not eating, just return the result.
+            if (!eatAndDestroy)
+            {
+                return ret;
+            }
+
+            // Eat karma flowers.
+            if (checkRoom.game.session is StoryGameSession s && !s.saveState.deathPersistentSaveData.reinforcedKarma)
+            {
+                foreach (var entities in checkRoom.abstractRoom.entities)
+                {
+                    if (entities is AbstractPhysicalObject o && o.realizedObject != null && o.type == AbstractPhysicalObject.AbstractObjectType.KarmaFlower)
+                    {
+                        s.saveState.deathPersistentSaveData.reinforcedKarma = true;
+                        if (self.SessionRecord != null)
+                        {
+                            self.SessionRecord.AddEat(o.realizedObject);
+                        }
+                        break;
+                    }
+                }
+            }
+
+            // If you'd starve anyway, don't eat anything.
+            if (ret < self.slugcatStats.foodToHibernate)
+            {
+                return ret;
+            }
+
+            var count = self.FoodInStomach + self.playerState.quarterFoodPoints * 0.25f;
+
+            // Eat things in hands first.
+            for (int j = 0; j < self.grasps.Length; j++)
+            {
+                if (self.grasps[j]?.grabbed is IPlayerEdible edible)
+                {
+                    count += edible.FoodPoints * rules.Insatiable;
+
+                    var grabbed = self.grasps[j].grabbed;
+                    foreach (var stick in self.abstractCreature.stuckObjects)
+                    {
+                        if (stick.A == self.abstractCreature && stick.B == grabbed.abstractPhysicalObject)
+                        {
+                            stick.Deactivate();
+                        }
+                    }
+                    if (self.SessionRecord != null)
+                    {
+                        self.SessionRecord.AddEat(grabbed);
+                    }
+                    grabbed.Destroy();
+                    checkRoom.RemoveObject(grabbed);
+                    checkRoom.abstractRoom.RemoveEntity(grabbed.abstractPhysicalObject);
+                    self.ReleaseGrasp(j);
+
+                    if (count >= self.MaxFoodInStomach)
+                    {
+                        return self.MaxFoodInStomach;
+                    }
+                }
+            }
+
+            // If satisfied, stop eating.
+            if (count >= self.slugcatStats.foodToHibernate)
+            {
+                return (int)count;
+            }
+
+            // Eat anything else in shelter.
+            for (int l = checkRoom.abstractRoom.entities.Count - 1; l >= 0; l--)
+            {
+                if (checkRoom.abstractRoom.entities[l] is AbstractPhysicalObject o && o.realizedObject is IPlayerEdible i && self.ObjectCountsAsFood(o.realizedObject))
+                {
+                    count += i.FoodPoints * rules.Insatiable;
+
+                    foreach (var stick in self.abstractCreature.stuckObjects)
+                    {
+                        if (stick.A == self.abstractCreature && stick.B == o.realizedObject.abstractPhysicalObject)
+                        {
+                            stick.Deactivate();
+                        }
+                    }
+                    if (self.SessionRecord != null)
+                    {
+                        self.SessionRecord.AddEat(o.realizedObject);
+                    }
+                    o.realizedObject.Destroy();
+                    checkRoom.RemoveObject(o.realizedObject);
+                    checkRoom.abstractRoom.RemoveEntity(o.realizedObject.abstractPhysicalObject);
+
+                    if (count >= self.slugcatStats.foodToHibernate)
+                    {
+                        return (int)count;
+                    }
+                }
+            }
+
+            return (int)count;
         }
 
         private void FoodMeter_ctor(On.HUD.FoodMeter.orig_ctor orig, HUD.FoodMeter self, HUD.HUD hud, int maxFood, int survivalLimit)
