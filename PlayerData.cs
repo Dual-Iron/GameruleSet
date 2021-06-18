@@ -5,6 +5,7 @@ namespace GameruleSet
 {
     internal struct PlayerData : IWeakData<PlayerState>
     {
+        public bool usedPainkiller;
         public int injuryCooldown;
         public bool injured;
         public float damageBlockedWithMask;

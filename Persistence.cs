@@ -4,6 +4,7 @@ using StaticTables;
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 
 namespace GameruleSet
 {
@@ -215,13 +216,23 @@ namespace GameruleSet
 
                 for (int j = 0; j < abstractRoom.entities.Count; j++)
                 {
-                    if (abstractRoom.entities[j] is AbstractPhysicalObject o && 
-                        o.pos.x >= 0 && o.pos.x <= abstractRoom.size.x && 
+                    if (abstractRoom.entities[j] is not AbstractPhysicalObject o)
+                        continue;
+
+                    foreach (var stick in o.stuckObjects)
+                    {
+                        if (stick.A == o)
+                        {
+                            self.savedSticks.Add(stick.SaveToString(abstractRoom.index));
+                        }
+                    }
+
+                    if (o.pos.x >= 0 && o.pos.x <= abstractRoom.size.x && 
                         o.pos.y >= 0 && o.pos.y <= abstractRoom.size.y &&
                         o.type != AbstractPhysicalObject.AbstractObjectType.Creature && 
                         o.type != AbstractPhysicalObject.AbstractObjectType.KarmaFlower && 
                         o.type != AbstractPhysicalObject.AbstractObjectType.Rock && 
-                        o.GetType() != typeof(Spear) && 
+                        (o is not AbstractSpear s || o.GetType() != typeof(AbstractSpear) || s.explosive || !s.stuckInWall && o.stuckObjects.Any(s => s != null)) && 
                         (o is not AbstractConsumable c || c.isConsumed && AbstractConsumable.IsTypeConsumable(o.type)))
                     {
                         if (PersistenceApplies(ref room, ref rain, self.world, o.pos))

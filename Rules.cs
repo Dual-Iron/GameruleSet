@@ -33,14 +33,14 @@ namespace GameruleSet
             Injury = new BoolRule(false)
             {
                 ID = "injury",
-                Description = "While healthy, if you suffer a critical injury, you survive and become injured until you sleep. Headshots are still lethal unless you're holding a vulture mask. King vulture masks are even safer."
+                Description = "While healthy, if you suffer a critical injury, you survive and become injured until you sleep. Headshots are still lethal unless you're holding a vulture mask. King vulture masks are sturdy. Mushrooms let you push through the pain of injury."
             };
 
             Imbalanced = new BoolRule(false) { ID = "karmically_imbalanced", Description = "Karma flowers don't spawn." };
 
-            Corpulent = new FloatRule(1, 0, 4) { ID = "corpulent", Description = "How much food is needed to hibernate. A value greater than 1 means more, and a value less than 1 means less." };
+            Corpulent = new FloatRule(1, 0, 4) { ID = "corpulent", Description = "Multiplier for the amount of food needed to hibernate." };
 
-            Insatiable = new FloatRule(1, 0, 4) { ID = "insatiable", Description = "Food gives x times more food pips." };
+            Insatiable = new FloatRule(1, 0, 4) { ID = "insatiable", Description = "Multiplier for the amount of food pips that items give." };
 
             Dislodge = new BoolRule(false) { ID = "dislodge_spears", Description = "You can dislodge stuck spears if you are standing nearby or hanging from them." };
 

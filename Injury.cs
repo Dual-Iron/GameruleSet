@@ -153,11 +153,25 @@ namespace GameruleSet
                 // Aerobic level decreases 33% slower
                 if (self.aerobicLevel < data.lastAerobicLevel)
                     self.aerobicLevel -= (self.aerobicLevel - data.lastAerobicLevel) / 3f;
-
                 data.lastAerobicLevel = self.aerobicLevel;
 
+                if (self.Adrenaline > 0)
+                {
+                    self.aerobicLevel = 0;
+                    data.usedPainkiller = true;
+                }
+                else if (data.usedPainkiller)
+                {
+                    data.usedPainkiller = false;
+                    self.aerobicLevel = 1;
+                }
+                else
+                {
+                    self.slowMovementStun = Math.Max(self.slowMovementStun, (int)(6 * self.aerobicLevel));
+                }
+
                 // If exhausted, experience pain
-                if (self.aerobicLevel >= 1 || self.aerobicLevel >= 0.9 && self.Malnourished)
+                if (self.aerobicLevel >= 1)
                 {
                     data.painTime = maxPainTime;
                     self.Stun(80);
@@ -191,15 +205,13 @@ namespace GameruleSet
 
                     if (self.aerobicLevel < 0.4f)
                     {
-                        data.painTime--;
+                        data.painTime -= self.Adrenaline > 0 ? 3 : 1;
 
                         if (UnityEngine.Random.value < 0.18)
                             self.Blink(5);
                     }
                     else self.Blink(5);
                 }
-
-                self.slowMovementStun = Math.Max(self.slowMovementStun, (int)(6 * self.aerobicLevel));
             }
 
             orig(self, eu);
