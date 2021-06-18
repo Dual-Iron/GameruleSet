@@ -13,7 +13,7 @@
 
         private void RainCycle_ctor(On.RainCycle.orig_ctor orig, RainCycle self, World world, float minutes)
         {
-            orig(self, world, (float)(minutes * rules.CycleLength));
+            orig(self, world, UnityEngine.Mathf.Max(41f/40f, minutes * rules.CycleLength));
         }
     }
 }
