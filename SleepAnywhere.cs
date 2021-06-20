@@ -20,6 +20,9 @@ namespace GameruleSet
         {
             public int sleepingFor;
             public int groggy;
+
+            void IWeakData<Player>.Construct(Player key) { }
+            void IWeakData<Player>.Destruct() { }
         }
 
         private readonly Rules rules;

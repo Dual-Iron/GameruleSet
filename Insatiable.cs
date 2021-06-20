@@ -8,6 +8,9 @@ namespace GameruleSet
         struct InsatiableData : IWeakData<PlayerState>
         {
             public double hunger;
+
+            void IWeakData<PlayerState>.Construct(PlayerState key) { }
+            void IWeakData<PlayerState>.Destruct() { }
         }
 
         private readonly Rules rules;

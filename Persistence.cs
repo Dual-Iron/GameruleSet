@@ -15,11 +15,11 @@ namespace GameruleSet
             public const int defaultDayDead = int.MinValue;
             public int dayDead;
 
-            void IDisposable.Dispose() { }
-            void IWeakData<AbstractCreature>.Initialize(AbstractCreature owner, object? state)
+            void IWeakData<AbstractCreature>.Construct(AbstractCreature owner)
             {
                 dayDead = defaultDayDead;
             }
+            void IWeakData<AbstractCreature>.Destruct() { }
         }
 
         private readonly Rules rules;

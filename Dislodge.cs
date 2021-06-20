@@ -19,11 +19,11 @@ namespace GameruleSet
             public float time;
             public int graspUsed;
 
-            void IDisposable.Dispose() { }
-            void IWeakData<Player>.Initialize(Player owner, object? state)
+            void IWeakData<Player>.Construct(Player owner)
             {
                 spear = new();
             }
+            void IWeakData<Player>.Destruct() { }
         }
 
         private readonly Rules rules;

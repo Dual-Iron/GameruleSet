@@ -21,6 +21,9 @@ namespace GameruleSet
             public int painTime;
             public float lastAerobicLevel;
             public float woundDir;
+
+            void IWeakData<PlayerState>.Construct(PlayerState key) { }
+            void IWeakData<PlayerState>.Destruct() { }
         }
 
         private readonly Rules rules;
