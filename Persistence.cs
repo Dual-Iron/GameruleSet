@@ -47,19 +47,20 @@ namespace GameruleSet
             orig(self);
         }
 
-        private AbstractCreature SaveState_AbstractCreatureFromString(On.SaveState.orig_AbstractCreatureFromString orig, World world, string creatureString, bool onlyInCurrentRegion)
+        private AbstractCreature? SaveState_AbstractCreatureFromString(On.SaveState.orig_AbstractCreatureFromString orig, World world, string creatureString, bool onlyInCurrentRegion)
         {
             try
             {
                 var critter = orig(world, creatureString, onlyInCurrentRegion);
+                if (critter == null)
+                    return null;
+
                 var data = creatureString.Split(new[] { "<cPOS>" }, StringSplitOptions.None);
-                if (data.Length >= 3 && rules.Persistence.Value != PersistenceEnum.None)
+                if (data.Length >= 3 && rules.Persistence.Value != PersistenceEnum.None && 
+                    int.TryParse(data[1], out int x) && int.TryParse(data[2], out int y))
                 {
-                    if (int.TryParse(data[1], out int x) && int.TryParse(data[2], out int y))
-                    {
-                        critter.pos.x = x;
-                        critter.pos.y = y;
-                    }
+                    critter.pos.x = x;
+                    critter.pos.y = y;
                 }
 
                 if (critter.state.alive)
@@ -68,13 +69,12 @@ namespace GameruleSet
                 }
 
                 data = creatureString.Split(new[] { "<cDEATH>" }, StringSplitOptions.None);
-                if (data.Length >= 3 && rules.Persistence.Value != PersistenceEnum.None)
+                if (data.Length >= 3 && rules.Persistence.Value != PersistenceEnum.None &&
+                    int.TryParse(data[1], out int dayDead))
                 {
-                    if (int.TryParse(data[1], out int dayDead))
-                    {
-                        critter.Data().Get<AbstractCreatureData>().dayDead = dayDead;
-                    }
+                    critter.Data().Get<AbstractCreatureData>().dayDead = dayDead;
                 }
+
                 return critter;
             }
             catch (Exception e)

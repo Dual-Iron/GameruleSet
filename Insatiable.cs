@@ -1,9 +1,18 @@
 ﻿using StaticTables;
+using System;
 
 namespace GameruleSet
 {
     public class Insatiable
     {
+        struct InsatiableData : IWeakData<PlayerState>
+        {
+            public double hunger;
+
+            void IDisposable.Dispose() { }
+            void IWeakData<PlayerState>.Initialize(PlayerState owner, object? state) { }
+        }
+
         private readonly Rules rules;
 
         public Insatiable(Rules rules)
@@ -192,7 +201,7 @@ namespace GameruleSet
 
         private void AddFood(Player player, double amount)
         {
-            ref var data = ref player.playerState.Data().Get<PlayerData>();
+            ref var data = ref player.playerState.Data().Get<InsatiableData>();
 
             amount += data.hunger;
 

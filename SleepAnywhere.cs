@@ -10,7 +10,7 @@ namespace GameruleSet
     {
         const int startCurl = 120;
         const int startSleeping = 300;
-        const int maxSleeping = startSleeping + 200;
+        const int maxSleeping = startSleeping + 320;
 
         struct SleepData : IWeakData<Player>
         {
@@ -66,23 +66,28 @@ namespace GameruleSet
                 orig(self, dt);
                 return;
             }
-
-            int sleepingAmount = GetGlobalSleepingFor(game);
-            if (sleepingAmount > startSleeping)
+            try
             {
-                self.framesPerSecond += sleepingAmount - startSleeping;
-                self.framesPerSecond = Mathf.Clamp(self.framesPerSecond, 1, 1000);
-
-                self.myTimeStacker += dt * self.framesPerSecond;
-                while (self.myTimeStacker >= 1f)
+                int sleepingAmount = GetGlobalSleepingFor(game);
+                if (sleepingAmount > startSleeping)
                 {
-                    self.Update();
-                    self.myTimeStacker -= 1f;
+                    self.framesPerSecond += sleepingAmount - startSleeping;
+                    self.framesPerSecond = Mathf.Clamp(self.framesPerSecond, 1, 500);
+                    self.myTimeStacker += Mathf.Clamp(self.framesPerSecond * dt, 0, 50);
+                    while (self.myTimeStacker >= 1f)
+                    {
+                        self.Update();
+                        self.myTimeStacker -= 1f;
+                    }
+                    self.GrafUpdate(self.myTimeStacker);
                 }
-                self.GrafUpdate(self.myTimeStacker);
+                else
+                    orig(self, dt);
             }
-            else
-                orig(self, dt);
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+            }
         }
 
         private static int GetGlobalSleepingFor(RainWorldGame game)

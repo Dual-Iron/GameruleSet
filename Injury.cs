@@ -1,14 +1,31 @@
 ﻿using Mono.Cecil.Cil;
 using MonoMod.Cil;
+using MonoMod.RuntimeDetour;
 using RWCustom;
 using StaticTables;
 using System;
+using System.Linq;
 using UnityEngine;
 
 namespace GameruleSet
 {
     public class Injury
     {
+        struct InjuryData : IWeakData<PlayerState>
+        {
+            public bool usedPainkiller;
+            public int injuryCooldown;
+            public bool injured;
+            public float damageBlockedWithMask;
+            public float danger;
+            public int painTime;
+            public float lastAerobicLevel;
+            public float woundDir;
+
+            void IDisposable.Dispose() { }
+            void IWeakData<PlayerState>.Initialize(PlayerState owner, object? state) { }
+        }
+
         private readonly Rules rules;
 
         private Action? replaceDeath;
@@ -25,6 +42,35 @@ namespace GameruleSet
             On.Creature.SpearStick += Creature_SpearStick;
             On.Player.Update += Player_Update;
             On.Player.Stun += Player_Stun;
+
+            new Hook(typeof(VirtualMicrophone).GetMethod("get_InWorldSoundsVolumeGoal"), (Func<Func<VirtualMicrophone, float>, VirtualMicrophone, float>)GetterInWorldSoundsVolumeGoal)
+                    .Apply();
+        }
+
+        private float GetterInWorldSoundsVolumeGoal(Func<VirtualMicrophone, float> orig, VirtualMicrophone self)
+        {
+            if (rules.Injury)
+            {
+                var average = 0f;
+                var count = 0;
+
+                foreach (var item in self.room.abstractRoom.entities)
+                {
+                    if (item is AbstractCreature c && c.realizedCreature is Player p && p.State.alive)
+                    {
+                        average += p.playerState.Data().Get<InjuryData>().painTime;
+                        count++;
+                    }
+                }
+
+                average /= count;
+
+                if (average > 1)
+                {
+                    return orig(self) * Mathf.Lerp(1, 0.5f, 1f - 1f / Mathf.Sqrt(average));
+                }
+            }
+            return orig(self);
         }
 
         private void PlayerGraphics_Update(On.PlayerGraphics.orig_Update orig, PlayerGraphics self)
@@ -37,7 +83,7 @@ namespace GameruleSet
             {
                 orig(self);
 
-                var data = self.player.playerState.Data().Get<PlayerData>();
+                var data = self.player.playerState.Data().Get<InjuryData>();
                 if (data.injured)
                 {
                     if (self.malnourished < 1)
@@ -86,7 +132,7 @@ namespace GameruleSet
             {
                 var stun = (int)Custom.LerpMap(speed, 35f, 60f, 40f, 140f, 2.5f);
                 var damage = self.Template.instantDeathDamageLimit * speed / 60;
-                self.Violence(null, null, self.bodyChunks[chunk], null, Creature.DamageType.Blunt, damage, stun);
+                self.Violence(null, direction.ToVector2().normalized, self.bodyChunks[chunk], null, Creature.DamageType.Blunt, damage, stun);
             }
 
             replaceDeath = ApplyDamageFromFalling;
@@ -96,7 +142,7 @@ namespace GameruleSet
 
         private void Player_Stun(On.Player.orig_Stun orig, Player self, int st)
         {
-            if (rules.Injury && self.playerState.Data().Get<PlayerData>().injured)
+            if (rules.Injury && self.playerState.Data().Get<InjuryData>().injured)
             {
                 self.AerobicIncrease(st / 15f);
                 st = (int)(st * 1.5f);
@@ -118,7 +164,7 @@ namespace GameruleSet
         {
             if (rules.Injury && obj is Player player)
             {
-                if (player.playerState.Data().Get<PlayerData>().injuryCooldown > 0)
+                if (player.playerState.Data().Get<InjuryData>().injuryCooldown > 0)
                 {
                     return false;
                 }
@@ -144,7 +190,7 @@ namespace GameruleSet
                 return;
             }
 
-            ref var data = ref self.playerState.Data().Get<PlayerData>();
+            ref var data = ref self.playerState.Data().Get<InjuryData>();
 
             if (data.injured && self.State.alive)
             {
@@ -255,7 +301,7 @@ namespace GameruleSet
         {
             if (rules.Injury && self is Player player)
             {
-                ref var data = ref player.playerState.Data().Get<PlayerData>();
+                ref var data = ref player.playerState.Data().Get<InjuryData>();
                 if (hitChunk.index == 0 && (type == Creature.DamageType.Stab || type == Creature.DamageType.Blunt))
                 {
                     var mask = GetGraspedMask(player);
@@ -274,7 +320,7 @@ namespace GameruleSet
                 else if (damage >= self.Template.instantDeathDamageLimit)
                 {
                     // Adrenaline surge!
-                    player.AerobicIncrease(-9);
+                    player.aerobicLevel = 0;
 
                     // Oh shit
                     if (data.injuryCooldown > 0)
@@ -287,7 +333,7 @@ namespace GameruleSet
                         data.woundDir = (directionAndMomentum?.GetAngle() ?? (UnityEngine.Random.value * 360)) - player.bodyChunks[1].Rotation.GetAngle();
                         data.injured = true;
                         data.injuryCooldown = 10;
-                        stunBonus += damage * 30;
+                        stunBonus = 0;
                         damage = 0;
                     }
                 }
