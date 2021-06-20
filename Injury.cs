@@ -21,9 +21,6 @@ namespace GameruleSet
             public int painTime;
             public float lastAerobicLevel;
             public float woundDir;
-
-            void IDisposable.Dispose() { }
-            void IWeakData<PlayerState>.Initialize(PlayerState owner, object? state) { }
         }
 
         private readonly Rules rules;

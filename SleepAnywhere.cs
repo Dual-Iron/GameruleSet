@@ -20,9 +20,6 @@ namespace GameruleSet
         {
             public int sleepingFor;
             public int groggy;
-
-            void IDisposable.Dispose() { }
-            void IWeakData<Player>.Initialize(Player owner, object? state) { }
         }
 
         private readonly Rules rules;

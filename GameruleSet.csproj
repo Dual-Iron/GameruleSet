@@ -25,8 +25,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Reference Include="ref\GameruleAPI.dll" />
-    <Reference Include="ref\StaticTables.dll" />
+    <Reference Include="$(SteamPath)\Mods\GameruleAPI.dll" />
+    <Reference Include="$(SteamPath)\Mods\StaticTables.dll" />
     <Reference Include="$(BepPath)\core\BepInEx.dll" />
     <Reference Include="$(BepPath)\core\BepInEx.Preloader.dll" />
     <Reference Include="$(BepPath)\core\Mono.Cecil.dll" />

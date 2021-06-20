@@ -12,12 +12,11 @@ namespace GameruleSet
 {
     public class SaveShelterPositions
     {
-        struct SaveStateData : IWeakData<SaveState>
+        struct SaveStateData : IWeakData<SaveState>, IConstructible<SaveState>
         {
             public IntVector2[] pos;
 
-            void IDisposable.Dispose() { }
-            void IWeakData<SaveState>.Initialize(SaveState owner, object? state)
+            void IConstructible<SaveState>.Construct(SaveState owner, object? state)
             {
                 pos = new IntVector2[0];
             }
