@@ -1,7 +1,11 @@
-﻿using MonoMod.RuntimeDetour;
+﻿using Mono.Cecil.Cil;
+using MonoMod.Cil;
+using MonoMod.RuntimeDetour;
+using Partiality;
 using StaticTables;
 using System;
 using System.Linq;
+using System.Reflection;
 using UnityEngine;
 
 namespace GameruleSet
@@ -22,10 +26,55 @@ namespace GameruleSet
         }
 
         private readonly Rules rules;
+        private bool caughtMMF;
 
         public SleepAnywhere(Rules rules)
         {
             this.rules = rules;
+
+            // Many More Fixes hooks MainLoopProcess_RawUpdate but doesn't call orig,
+            // so here I forcefully ignore their implementation to allow mine to exist.
+            On.RainWorld.Update += RainWorld_Update;
+
+            void RainWorld_Update(On.RainWorld.orig_Update orig, RainWorld self)
+            {
+                orig(self);
+
+                if (caughtMMF)
+                    return;
+
+                var mmf = PartialityManager.Instance.modManager.loadedMods.FirstOrDefault(pm => pm.ModID == "Many More Fixes");
+                if (mmf == null)
+                    return;
+
+                caughtMMF = true;
+
+                var method = mmf.GetType().Assembly
+                    .GetType("ManyMoreFixes.MiscChangesHK")?
+                    .GetMethod("MainLoopProcess_RawUpdate", BindingFlags.NonPublic | BindingFlags.Static);
+
+                if (method == null)
+                    return;
+
+                try
+                {
+                    new ILHook(method, ExtraHook).Apply();
+                }
+                catch (Exception e)
+                {
+                    rules.Logger.LogError(e);
+                }
+
+                static void ExtraHook(ILContext il)
+                {
+                    var cursor = new ILCursor(il);
+                    cursor.Emit(OpCodes.Ldarg_0);
+                    cursor.Emit(OpCodes.Ldarg_1);
+                    cursor.Emit(OpCodes.Ldarg_2);
+                    cursor.Emit(OpCodes.Callvirt, typeof(On.MainLoopProcess).GetNestedType("orig_RawUpdate").GetMethod("Invoke"));
+                    cursor.Emit(OpCodes.Ret);
+                }
+            }
 
             On.Player.Stun += Player_Stun;
             On.Player.Update += Player_Update;
@@ -61,19 +110,21 @@ namespace GameruleSet
 
         private void MainLoopProcess_RawUpdate(On.MainLoopProcess.orig_RawUpdate orig, MainLoopProcess self, float dt)
         {
-            if (!rules.SleepAnywhere || self is not RainWorldGame game || game.pauseMenu != null || !game.processActive)
-            {
-                orig(self, dt);
-                return;
-            }
             try
             {
+                orig(self, dt);
+
+                if (!rules.SleepAnywhere || self is not RainWorldGame game || game.pauseMenu != null || !game.processActive)
+                {
+                    return;
+                }
+
                 int sleepingAmount = GetGlobalSleepingFor(game);
                 if (sleepingAmount > startSleeping)
                 {
-                    self.framesPerSecond += sleepingAmount - startSleeping;
-                    self.framesPerSecond = Mathf.Clamp(self.framesPerSecond, 1, 500);
-                    self.myTimeStacker += Mathf.Clamp(self.framesPerSecond * dt, 0, 10);
+                    var extraFps = sleepingAmount - startSleeping;
+
+                    self.myTimeStacker += Mathf.Clamp(extraFps * dt, 0, 10);
                     while (self.myTimeStacker >= 1f)
                     {
                         self.Update();
@@ -81,12 +132,10 @@ namespace GameruleSet
                     }
                     self.GrafUpdate(self.myTimeStacker);
                 }
-                else
-                    orig(self, dt);
             }
             catch (Exception e)
             {
-                rules.Logger.LogError(e);
+                rules.Logger.LogError($"Main loop process {self.GetType()} threw an uncaught exception.\n" + e);
             }
         }
 
