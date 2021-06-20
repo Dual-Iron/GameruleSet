@@ -10,7 +10,7 @@ namespace GameruleSet
     {
         const int startCurl = 120;
         const int startSleeping = 300;
-        const int maxSleeping = startSleeping + 320;
+        const int maxSleeping = startSleeping + 400;
 
         struct SleepData : IWeakData<Player>
         {
@@ -73,7 +73,7 @@ namespace GameruleSet
                 {
                     self.framesPerSecond += sleepingAmount - startSleeping;
                     self.framesPerSecond = Mathf.Clamp(self.framesPerSecond, 1, 500);
-                    self.myTimeStacker += Mathf.Clamp(self.framesPerSecond * dt, 0, 50);
+                    self.myTimeStacker += Mathf.Clamp(self.framesPerSecond * dt, 0, 10);
                     while (self.myTimeStacker >= 1f)
                     {
                         self.Update();
@@ -86,7 +86,7 @@ namespace GameruleSet
             }
             catch (Exception e)
             {
-                Console.WriteLine(e);
+                rules.Logger.LogError(e);
             }
         }
 
