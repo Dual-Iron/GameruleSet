@@ -106,12 +106,12 @@ namespace GameruleSet
 
             var count = self.FoodInStomach + self.playerState.quarterFoodPoints * 0.25f;
 
-            // Eat things in hands first.
+            // Eat flies in hands first.
             for (int j = 0; j < self.grasps.Length; j++)
             {
-                if (self.grasps[j]?.grabbed is IPlayerEdible edible)
+                if (self.grasps[j]?.grabbed is Fly fly)
                 {
-                    count += edible.FoodPoints * rules.Insatiable;
+                    count += fly.FoodPoints * rules.Insatiable;
 
                     var grabbed = self.grasps[j].grabbed;
                     foreach (var stick in self.abstractCreature.stuckObjects)
