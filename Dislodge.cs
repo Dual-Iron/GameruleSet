@@ -41,7 +41,10 @@ namespace GameruleSet
             On.Spear.ChangeMode += Spear_ChangeMode;
         }
 
-        private bool IsOnWall(Player self) => self.bodyChunks[1].ContactPoint.y >= 0 && self.bodyMode != ClimbIntoShortCut && self.bodyMode != CorridorClimb;
+        private bool IsOnWall(Player self)
+        {
+            return self.bodyChunks[1].ContactPoint.y >= 0 && self.bodyMode != ClimbIntoShortCut && self.bodyMode != CorridorClimb;
+        }
 
         private void PlayerGraphics_DrawSprites(On.PlayerGraphics.orig_DrawSprites orig, PlayerGraphics self, RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, float timeStacker, Vector2 camPos)
         {
@@ -92,66 +95,52 @@ namespace GameruleSet
         {
             orig(self);
 
-            try
+            ref var data = ref self.player.Data().Get<DislodgeAnim>();
+            if (IsPullingSpear(self.player, data, out var spear))
             {
-                ref var data = ref self.player.Data().Get<DislodgeAnim>();
-                if (self.player.animation == EnumExt_GameruleSet.PullingSpear && data.spear.TryGetTarget(out var spear))
+                var pos = self.player.room.MiddleOfTile(spear!.abstractSpear.pos);
+
+                if (data.time < maxTime - 4)
                 {
-                    var pos = self.player.room.MiddleOfTile(spear.abstractSpear.pos);
-
-                    if (data.time < maxTime - 4)
-                    {
-                        self.LookAtPoint(self.player.firstChunk.pos + (self.player.firstChunk.pos - pos), 20);
-                        self.blink = 5;
-                    }
-
-                    if (IsOnWall(self.player))
-                    {
-                        self.legsDirection = (self.player.bodyChunks[1].pos - self.player.bodyChunks[0].pos).normalized;
-                    }
-
-                    for (int i = 0; i < 2; i++)
-                    {
-                        self.hands[i].mode = Limb.Mode.HuntAbsolutePosition;
-                        self.hands[i].absoluteHuntPos = pos - spear.rotation * 8 * i;
-                        self.hands[i].pos = self.hands[i].absoluteHuntPos;
-                    }
+                    self.LookAtPoint(self.player.firstChunk.pos + (self.player.firstChunk.pos - pos), 20);
+                    self.blink = 5;
                 }
-            }
-            catch (Exception e)
-            {
-                rules.Logger.LogError(e);
+
+                if (IsOnWall(self.player))
+                {
+                    self.legsDirection = (self.player.bodyChunks[1].pos - self.player.bodyChunks[0].pos).normalized;
+                }
+
+                for (int i = 0; i < 2; i++)
+                {
+                    self.hands[i].mode = Limb.Mode.HuntAbsolutePosition;
+                    self.hands[i].absoluteHuntPos = pos - spear.rotation * 8 * i;
+                    self.hands[i].pos = self.hands[i].absoluteHuntPos;
+                }
             }
         }
 
         private void Player_UpdateAnimation(On.Player.orig_UpdateAnimation orig, Player self)
         {
-            ref var data = ref self.Data().Get<DislodgeAnim>();
-            if (!data.spear.TryGetTarget(out var spear))
-            {
-                if (self.animation == EnumExt_GameruleSet.PullingSpear)
-                    self.animation = Player.AnimationIndex.None;
-                data.time = 0;
-                orig(self);
-            }
-            else
+            ref var data = ref self.Data().Get<DislodgeAnim>();;
+            if (IsPullingSpear(self, data, out var spear))
             {
                 self.animation = EnumExt_GameruleSet.PullingSpear;
 
                 orig(self);
 
-                var horizontal = Mathf.Abs(spear.rotation.x) > 0.01f;
+                var horizontal = Mathf.Abs(spear!.rotation.x) > 0.01f;
                 var target = self.room.MiddleOfTile(spear.abstractPhysicalObject.pos);
 
                 // If too far from any of the spear's body chunks, plop off
-                if (spear.bodyChunks.Min(b => (b.pos - self.firstChunk.pos).magnitude) > 35 * 35)
+                if ((spear.bodyChunks[0].pos - self.firstChunk.pos).sqrMagnitude > 35 * 35)
                 {
-                    self.room.PlaySound(SoundID.Big_Needle_Worm_Impale_Terrain, spear.firstChunk.pos, 1.1f, 0.9f);
+                    self.room.PlaySound(SoundID.Spear_Stick_In_Wall, spear.firstChunk.pos, 1.2f, 1.1f);
                     self.animation = Player.AnimationIndex.None;
                     self.bodyMode = Stunned;
-                    data.time = float.NegativeInfinity;
-                    self.Stun(80);
                     self.SlugcatGrab(spear, data.graspUsed);
+                    self.Stun(60);
+                    StopPulling(ref data);
                 }
                 else
                 {
@@ -176,81 +165,112 @@ namespace GameruleSet
                             self.bodyChunks[1].vel.y *= 0.5f;
                         }
                     }
-                    else
+                    else if (horizontal || Math.Abs(self.bodyChunks[1].pos.x - target.x) > 6)
                     {
                         self.bodyChunks[0].vel.x -= Math.Sign(target.x - self.bodyChunks[1].pos.x);
                         self.bodyChunks[1].vel.x += Math.Sign(target.x - self.bodyChunks[1].pos.x);
                     }
-                }
 
-                self.aerobicLevel = Math.Max(self.aerobicLevel, 1f / Math.Max(1, data.time + 1f));
-
-                if (data.time > 0)
-                {
-                    float distance = Math.Abs(horizontal ? target.y - self.firstChunk.pos.y : target.x - self.firstChunk.pos.x);
-                    float delta = -1f / Mathf.Clamp(distance / 5f, 1f, 2f);
-
-                    if (self.bodyMode == ClimbIntoShortCut || self.bodyMode == CorridorClimb)
+                    if (data.time > 0)
                     {
-                        delta /= 2;
-                    }
+                        float distance = Math.Abs(horizontal ? target.y - self.bodyChunks[1].pos.y : target.x - self.bodyChunks[0].pos.x);
+                        float delta = -1f / Mathf.Clamp(distance / 15f, 1f, 2f);
 
-                    if (data.time > yank && data.time + delta <= yank)
-                    {
-                        self.room.PlaySound(SoundID.Spear_Fragment_Bounce, spear.firstChunk.pos, 0.65f, 1.2f);
-
-                        if (IsOnWall(self))
-                            self.room.PlaySound(SoundID.Slugcat_Normal_Jump, self.mainBodyChunk);
-
-                        int num = UnityEngine.Random.Range(1, 3);
-                        for (int i = 0; i < num; i++)
+                        if (self.bodyMode == Crawl || self.bodyMode == ClimbingOnBeam)
                         {
-                            var splashDir = -spear.rotation.normalized + Custom.DegToVec(UnityEngine.Random.value * 90 - 45);
-                            var pos = target + splashDir * 3f;
-                            var speed = UnityEngine.Random.value * 4;
-                            self.room.AddObject(new WaterDrip(pos, splashDir * speed, true));
+                            delta *= 0.85f;
+                        }
+                        else if (self.bodyMode != Stand)
+                        {
+                            delta *= 0.70f;
                         }
 
-                        var dir = (self.bodyChunks[0].pos - self.bodyChunks[1].pos).normalized;
-                        self.bodyChunks[0].vel += dir * 6;
-                        self.bodyChunks[1].vel -= dir * 3;
-                    }
+                        if (data.time > yank && data.time + delta <= yank)
+                        {
+                            FirstYank(self, spear, target);
+                        }
 
-                    data.time += delta;
-                }
-                // Ignore special case of float.NegativeInfinity
-                else if (data.time > float.NegativeInfinity)
-                {
-                    int num = UnityEngine.Random.Range(3, 6);
-                    for (int i = 0; i < num; i++)
+                        data.time += delta;
+                    }
+                    // Ignore special case of float.NegativeInfinity
+                    else if (data.time > float.NegativeInfinity)
                     {
-                        var splashDir = -spear.rotation.normalized + Custom.DegToVec(UnityEngine.Random.value * 120 - 60);
-                        var pos = target + splashDir * 4f;
-                        var speed = 1 + UnityEngine.Random.value * 6;
-                        self.room.AddObject(new WaterDrip(pos, splashDir * speed, true));
+                        RipSpear(self, ref data, spear, target);
                     }
-
-                    if (IsOnWall(self))
-                        self.room.PlaySound(SoundID.Slugcat_Super_Jump, self.firstChunk);
-
-                    self.room.PlaySound(SoundID.Spear_Stick_In_Wall, spear.firstChunk.pos, 1f, 1.2f);
-
-                    self.animation = Player.AnimationIndex.Flip;
-                    self.standing = false;
-
-                    var dir = (self.bodyChunks[0].pos - self.bodyChunks[1].pos).normalized;
-                    self.flipDirection = Math.Sign(dir.x);
-                    self.bodyChunks[0].vel += dir * 8;
-                    self.bodyChunks[1].vel += dir * 4;
-
-                    self.SlugcatGrab(spear, data.graspUsed);
-                }
-
-                if (self.animation != EnumExt_GameruleSet.PullingSpear)
-                {
-                    data.spear = new();
                 }
             }
+            else
+            {
+                orig(self);
+                StopPulling(ref data);
+            }
+        }
+
+        private static void StopPulling(ref DislodgeAnim data)
+        {
+            if (data.spear.TryGetTarget(out _))
+                data.spear = new();
+            data.time = 0;
+        }
+
+        private bool IsPullingSpear(Player self, DislodgeAnim data, out Spear? spear)
+        {
+            spear = null;
+            return rules.Dislodge && data.spear.TryGetTarget(out spear) && (self.bodyMode == CorridorClimb || self.bodyMode == ClimbIntoShortCut || self.animation == EnumExt_GameruleSet.PullingSpear);
+        }
+
+        private void FirstYank(Player self, Spear spear, Vector2 target)
+        {
+            self.room.PlaySound(SoundID.Spear_Fragment_Bounce, spear.firstChunk.pos, 0.65f, 1.2f);
+
+            if (IsOnWall(self))
+                self.room.PlaySound(SoundID.Slugcat_Normal_Jump, self.mainBodyChunk);
+
+            int num = UnityEngine.Random.Range(1, 3);
+            for (int i = 0; i < num; i++)
+            {
+                var splashDir = -spear.rotation.normalized + Custom.DegToVec(UnityEngine.Random.value * 90 - 45);
+                var pos = target + splashDir * 3f;
+                var speed = UnityEngine.Random.value * 4;
+                self.room.AddObject(new WaterDrip(pos, splashDir * speed, true));
+            }
+
+            var dir = (self.bodyChunks[0].pos - self.bodyChunks[1].pos).normalized;
+            self.bodyChunks[0].vel += dir * 6;
+            self.bodyChunks[1].vel -= dir * 3;
+
+            self.AerobicIncrease(3);
+        }
+
+        private void RipSpear(Player self, ref DislodgeAnim data, Spear spear, Vector2 target)
+        {
+            int num = UnityEngine.Random.Range(3, 6);
+            for (int i = 0; i < num; i++)
+            {
+                var splashDir = -spear.rotation.normalized + Custom.DegToVec(UnityEngine.Random.value * 120 - 60);
+                var pos = target + splashDir * 4f;
+                var speed = 1 + UnityEngine.Random.value * 6;
+                self.room.AddObject(new WaterDrip(pos, splashDir * speed, true));
+            }
+
+            if (IsOnWall(self))
+                self.room.PlaySound(SoundID.Slugcat_Super_Jump, self.firstChunk);
+
+            self.room.PlaySound(SoundID.Spear_Stick_In_Wall, spear.firstChunk.pos, 1f, 1.2f);
+
+            self.animation = Player.AnimationIndex.Flip;
+            self.standing = false;
+
+            var dir = (self.bodyChunks[0].pos - self.bodyChunks[1].pos).normalized;
+            self.flipDirection = Math.Sign(dir.x);
+            self.bodyChunks[0].vel += dir * 8;
+            self.bodyChunks[1].vel += dir * 4;
+
+            self.SlugcatGrab(spear, data.graspUsed);
+
+            self.AerobicIncrease(3);
+
+            StopPulling(ref data);
         }
 
         private void Player_checkInput(On.Player.orig_checkInput orig, Player self)
@@ -266,7 +286,6 @@ namespace GameruleSet
                 if (self.input[0].jmp)
                 {
                     self.animation = Player.AnimationIndex.Flip;
-                    data.spear = new();
                     return;
                 }
                 
@@ -347,11 +366,10 @@ namespace GameruleSet
             }
 
             // Spear must be in a wall and player must be within 30 units of it
-            if (obj is Spear s && s.mode == Weapon.Mode.StuckInWall && s.bodyChunks.Min(b => (b.pos - self.firstChunk.pos).magnitude) < 25)
+            if (obj is Spear s && s.mode == Weapon.Mode.StuckInWall && (s.bodyChunks[0].pos - self.firstChunk.pos).magnitude < 25)
             {
                 // If climbing on a beam but not hanging on the spear, boot
-                if (self.bodyMode == ClimbingOnBeam && 
-                    (self.animation != Player.AnimationIndex.HangFromBeam || self.room.GetTilePosition(self.firstChunk.pos).y != s.abstractPhysicalObject.pos.y))
+                if (self.bodyMode == ClimbingOnBeam && self.room.GetTilePosition(self.firstChunk.pos).y != s.abstractPhysicalObject.pos.y)
                 {
                     return false;
                 }

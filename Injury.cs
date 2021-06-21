@@ -94,8 +94,11 @@ namespace GameruleSet
                         self.LookAtNothing();
                     }
 
-                    self.breath += 1 / 50f;
-                    self.player.swimCycle += 0.05f * self.player.aerobicLevel;
+                    if (!self.player.lungsExhausted)
+                    {
+                        self.breath += 1 / 50f;
+                        self.player.swimCycle += 0.025f * self.player.aerobicLevel;
+                    }
 
                     if (!self.player.Stunned)
                     {
@@ -194,11 +197,11 @@ namespace GameruleSet
 
             if (data.injured && self.State.alive)
             {
-                const int maxPainTime = 120;
+                const int maxPainTime = 80;
 
                 // Aerobic level decreases 33% slower
                 if (self.aerobicLevel < data.lastAerobicLevel)
-                    self.aerobicLevel -= (self.aerobicLevel - data.lastAerobicLevel) / 3f;
+                    self.aerobicLevel -= (self.aerobicLevel - data.lastAerobicLevel) / 4f;
                 data.lastAerobicLevel = self.aerobicLevel;
 
                 if (self.Adrenaline > 0)
@@ -319,7 +322,6 @@ namespace GameruleSet
                 }
                 else if (damage >= self.Template.instantDeathDamageLimit)
                 {
-                    // Adrenaline surge!
                     player.aerobicLevel = 0;
 
                     // Oh shit
