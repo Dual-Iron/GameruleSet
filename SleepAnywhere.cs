@@ -122,9 +122,12 @@ namespace GameruleSet
                 int sleepingAmount = GetGlobalSleepingFor(game);
                 if (sleepingAmount > startSleeping)
                 {
+                    if (dt > 1 / 40f)
+                        dt = 1 / 40f;
+
                     var extraFps = sleepingAmount - startSleeping;
 
-                    self.myTimeStacker += Mathf.Clamp(extraFps * dt, 0, 10);
+                    self.myTimeStacker += extraFps * dt;
                     while (self.myTimeStacker >= 1f)
                     {
                         self.Update();
