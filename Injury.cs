@@ -75,7 +75,7 @@ namespace GameruleSet
 
         private void PlayerGraphics_Update(On.PlayerGraphics.orig_Update orig, PlayerGraphics self)
         {
-            if (!rules.Injury || self.player.dead)
+            if (!rules.Injury)
             {
                 orig(self);
             }
@@ -89,21 +89,25 @@ namespace GameruleSet
                     if (self.malnourished < 1)
                         self.malnourished += 0.01f;
 
-                    if (data.painTime > 0 || self.player.aerobicLevel >= 0.68f)
+                    if (self.player.State.alive)
                     {
-                        self.LookAtNothing();
-                    }
+                        if (data.painTime > 0)
+                        {
+                            self.objectLooker.lookAtPoint = null;
+                            self.objectLooker.LookAtNothing();
+                        }
 
-                    if (!self.player.lungsExhausted)
-                    {
-                        self.breath += 1 / 50f;
-                        self.player.swimCycle += 0.025f * self.player.aerobicLevel;
-                    }
+                        if (!self.player.lungsExhausted && !self.player.exhausted)
+                        {
+                            self.breath += 1 / 50f;
+                            self.player.swimCycle += 0.05f * self.player.aerobicLevel;
 
-                    if (!self.player.Stunned)
-                    {
-                        self.head.vel.y += Mathf.Sin(self.player.swimCycle * Mathf.PI * 2) * 0.25f;
-                        self.drawPositions[0, 0].y += Mathf.Sin(self.player.swimCycle * Mathf.PI * 2f) * 0.75f;
+                            if (self.player.stun <= 0)
+                            {
+                                self.head.vel.y += Mathf.Sin(self.player.swimCycle * Mathf.PI * 2) * 0.25f;
+                                self.drawPositions[0, 0].y += Mathf.Sin(self.player.swimCycle * Mathf.PI * 2f) * 0.75f;
+                            }
+                        }
                     }
                 }
             }
@@ -147,8 +151,7 @@ namespace GameruleSet
         {
             if (rules.Injury && self.playerState.Data().Get<InjuryData>().injured)
             {
-                self.AerobicIncrease(st / 15f);
-                st = (int)(st * 1.5f);
+                self.AerobicIncrease(st / 10f);
             }
             orig(self, st);
         }
@@ -216,7 +219,7 @@ namespace GameruleSet
                 }
                 else
                 {
-                    self.slowMovementStun = Math.Max(self.slowMovementStun, (int)(6 * self.aerobicLevel));
+                    self.slowMovementStun = Math.Max(self.slowMovementStun, (int)(5 * self.aerobicLevel));
                 }
 
                 // If exhausted, experience pain
@@ -302,7 +305,7 @@ namespace GameruleSet
 
         private void Creature_Violence(On.Creature.orig_Violence orig, Creature self, BodyChunk source, Vector2? directionAndMomentum, BodyChunk hitChunk, PhysicalObject.Appendage.Pos hitAppendage, Creature.DamageType type, float damage, float stunBonus)
         {
-            if (rules.Injury && self is Player player)
+            if (rules.Injury && self is Player player && player.State.alive)
             {
                 ref var data = ref player.playerState.Data().Get<InjuryData>();
                 if (hitChunk.index == 0 && (type == Creature.DamageType.Stab || type == Creature.DamageType.Blunt))
@@ -335,7 +338,12 @@ namespace GameruleSet
                         data.woundDir = (directionAndMomentum?.GetAngle() ?? (UnityEngine.Random.value * 360)) - player.bodyChunks[1].Rotation.GetAngle();
                         data.injured = true;
                         data.injuryCooldown = 10;
-                        stunBonus = 0;
+
+                        if (type == Creature.DamageType.Bite)
+                            stunBonus = 0;
+                        else
+                            stunBonus += damage * 30;
+
                         damage = 0;
                     }
                 }
