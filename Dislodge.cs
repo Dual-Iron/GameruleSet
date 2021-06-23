@@ -239,7 +239,7 @@ namespace GameruleSet
             self.bodyChunks[0].vel += dir * 6;
             self.bodyChunks[1].vel -= dir * 3;
 
-            self.AerobicIncrease(3);
+            self.AerobicIncrease(2);
         }
 
         private void RipSpear(Player self, ref DislodgeAnim data, Spear spear, Vector2 target)
@@ -268,7 +268,7 @@ namespace GameruleSet
 
             self.SlugcatGrab(spear, data.graspUsed);
 
-            self.AerobicIncrease(3);
+            self.AerobicIncrease(2);
 
             StopPulling(ref data);
         }

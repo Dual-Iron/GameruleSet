@@ -8,6 +8,8 @@ namespace GameruleSet
 {
     public class Injury
     {
+        private const int maxPainTime = 80;
+
         struct InjuryData : IWeakData<PlayerState>
         {
             public bool usedPainkiller;
@@ -18,6 +20,7 @@ namespace GameruleSet
             public int painTime;
             public float lastAerobicLevel;
             public float woundDir;
+            public bool shouldPain;
 
             void IWeakData<PlayerState>.Construct(PlayerState key) { }
             void IWeakData<PlayerState>.Destruct() { }
@@ -37,6 +40,7 @@ namespace GameruleSet
             On.Creature.Grab += Creature_Grab;
             On.Creature.Violence += Creature_Violence;
             On.Creature.SpearStick += Creature_SpearStick;
+            On.Player.AerobicIncrease += Player_AerobicIncrease;
             On.Player.Update += Player_Update;
             On.Player.Stun += Player_Stun;
 
@@ -60,11 +64,10 @@ namespace GameruleSet
                     }
                 }
 
-                average /= count;
-
-                if (average > 1)
+                if (average > 0)
                 {
-                    return orig(self) * Mathf.Lerp(1, 0.5f, 1f - 1f / Mathf.Sqrt(average));
+                    average /= count;
+                    return orig(self) * Mathf.Lerp(1f, 0.5f, average / maxPainTime);
                 }
             }
             return orig(self);
@@ -146,9 +149,9 @@ namespace GameruleSet
 
         private void Player_Stun(On.Player.orig_Stun orig, Player self, int st)
         {
-            if (rules.Injury && self.playerState.Data().Get<InjuryData>().injured)
+            if (st > 0 && rules.Injury && self.playerState.Data().Get<InjuryData>().injured)
             {
-                self.AerobicIncrease(st / 10f);
+                self.aerobicLevel = Mathf.Clamp(self.aerobicLevel + st / 100f, 0, 1);
             }
             orig(self, st);
         }
@@ -185,6 +188,17 @@ namespace GameruleSet
             return orig(self, obj, graspUsed, chunkGrabbed, shareability, dominance, overrideEquallyDominant, pacifying);
         }
 
+        private void Player_AerobicIncrease(On.Player.orig_AerobicIncrease orig, Player self, float f)
+        {
+            orig(self, f);
+
+            ref var data = ref self.playerState.Data().Get<InjuryData>();
+            if (rules.Injury && data.injured && self.aerobicLevel >= 1)
+            {
+                data.shouldPain = true;
+            }
+        }
+
         private void Player_Update(On.Player.orig_Update orig, Player self, bool eu)
         {
             if (!rules.Injury)
@@ -197,11 +211,9 @@ namespace GameruleSet
 
             if (data.injured && self.State.alive)
             {
-                const int maxPainTime = 80;
-
-                // Aerobic level decreases 33% slower
+                // Aerobic level decreases 20% slower
                 if (self.aerobicLevel < data.lastAerobicLevel)
-                    self.aerobicLevel -= (self.aerobicLevel - data.lastAerobicLevel) / 4f;
+                    self.aerobicLevel -= (self.aerobicLevel - data.lastAerobicLevel) * 0.2f;
                 data.lastAerobicLevel = self.aerobicLevel;
 
                 if (self.Adrenaline > 0)
@@ -216,26 +228,14 @@ namespace GameruleSet
                 }
                 else
                 {
-                    self.slowMovementStun = Math.Max(self.slowMovementStun, (int)(5 * self.aerobicLevel));
+                    self.slowMovementStun = Math.Max(self.slowMovementStun, (int)(5f * self.aerobicLevel));
                 }
 
                 // If exhausted, experience pain
-                if (self.aerobicLevel >= 1)
+                if (self.aerobicLevel >= 1 && data.painTime == 0 || data.shouldPain)
                 {
-                    data.painTime = maxPainTime;
-                    self.Stun(80);
-
-                    // Visuals
-                    self.room.PlaySound(SoundID.Slugcat_Swallow_Item, self.mainBodyChunk.pos, 1.25f, 2.2f);
-
-                    for (int i = 0; i < 4; i++)
-                    {
-                        var dir = self.bodyChunks[1].Rotation.GetAngle() + data.woundDir - 90 + UnityEngine.Random.value * 30 - 15;
-                        var pos = self.bodyChunks[1].pos + Custom.DegToVec(dir) * self.bodyChunks[1].rad * 0.75f;
-                        var direction = Custom.DegToVec(dir);
-                        var speed = 5 + UnityEngine.Random.value * 7;
-                        self.room.AddObject(new WaterDrip(pos, direction * speed, false));
-                    }
+                    data.shouldPain = false;
+                    Hurt(self, ref data);
                 }
 
                 // Forewarn pain
@@ -250,7 +250,7 @@ namespace GameruleSet
                 if (data.painTime > 0)
                 {
                     self.standing = false;
-                    self.slowMovementStun = Math.Max(self.slowMovementStun, 2 + (int)(6f * data.painTime / maxPainTime));
+                    self.slowMovementStun = Math.Max(self.slowMovementStun, 3 + (int)(5f * data.painTime / maxPainTime));
 
                     if (self.aerobicLevel < 0.4f)
                     {
@@ -264,6 +264,9 @@ namespace GameruleSet
             }
 
             orig(self, eu);
+
+            if (self.State.dead)
+                return;
 
             if (data.damageBlockedWithMask > 0)
             {
@@ -288,6 +291,24 @@ namespace GameruleSet
                 }
             }
             else data.danger = 0;
+        }
+
+        private static void Hurt(Player self, ref InjuryData data)
+        {
+            data.painTime = maxPainTime;
+            self.Stun(60);
+
+            // Visuals
+            self.room.PlaySound(SoundID.Slugcat_Swallow_Item, self.mainBodyChunk.pos, 1.25f, 2.2f);
+
+            for (int i = 0; i < 4; i++)
+            {
+                var dir = self.bodyChunks[1].Rotation.GetAngle() + data.woundDir - 90 + UnityEngine.Random.value * 30 - 15;
+                var pos = self.bodyChunks[1].pos + Custom.DegToVec(dir) * self.bodyChunks[1].rad * 0.75f;
+                var direction = Custom.DegToVec(dir);
+                var speed = 5 + UnityEngine.Random.value * 7;
+                self.room.AddObject(new WaterDrip(pos, direction * speed, false));
+            }
         }
 
         private bool Creature_SpearStick(On.Creature.orig_SpearStick orig, Creature self, Weapon source, float dmg, BodyChunk chunk, PhysicalObject.Appendage.Pos appPos, Vector2 direction)
