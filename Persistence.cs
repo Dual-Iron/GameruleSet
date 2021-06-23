@@ -61,7 +61,7 @@ namespace GameruleSet
                 ref var data = ref self.game.Data().Get<GameData>();
                 for (int i = startIndex; i < self.abstractRoom.entities.Count; i++)
                 {
-                    if (self.abstractRoom.entities[i] is AbstractPhysicalObject o && o is not AbstractConsumable)
+                    if (self.abstractRoom.entities[i] is AbstractPhysicalObject o && (o is not AbstractConsumable c || c.placedObjectIndex < 0))
                     {
                         data.dontSave.Add(o);
                     }
@@ -283,20 +283,11 @@ namespace GameruleSet
             if (rules == null || rules.Persistence.Value == PersistenceEnum.None)
                 return false;
 
-            room ??= new Room(world.game, world, world.GetAbstractRoom(coord));
-
-            // Forbid scav outputs/treasuries; they generate items
-            foreach (var placedObject in room.roomSettings.placedObjects)
-            {
-                if (placedObject.type == PlacedObject.Type.ScavengerOutpost || placedObject.type == PlacedObject.Type.ScavengerTreasury)
-                {
-                    return false;
-                }
-            }
-
             // Don't need to calculate anything if it's All
             if (rules.Persistence.Value == PersistenceEnum.All)
                 return true;
+
+            room ??= new Room(world.game, world, world.GetAbstractRoom(coord));
 
             // If dry, we're good
             if (room.roomSettings.DangerType == RoomRain.DangerType.None)
