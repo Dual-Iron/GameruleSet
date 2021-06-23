@@ -1,5 +1,4 @@
 ﻿using StaticTables;
-using System;
 
 namespace GameruleSet
 {

@@ -2,7 +2,7 @@
 using MonoMod.Cil;
 using StaticTables;
 using System;
-using System.Diagnostics;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
@@ -22,12 +22,24 @@ namespace GameruleSet
             void IWeakData<AbstractCreature>.Destruct() { }
         }
 
+        struct GameData : IWeakData<RainWorldGame>
+        {
+            public HashSet<AbstractPhysicalObject> dontSave;
+
+            void IWeakData<RainWorldGame>.Construct(RainWorldGame key)
+            {
+                dontSave = new();
+            }
+            void IWeakData<RainWorldGame>.Destruct() { }
+        }
+
         private readonly Rules rules;
 
         public Persistence(Rules rules)
         {
             this.rules = rules;
 
+            On.Room.Loaded += Room_Loaded;
             On.AbstractCreature.Die += AbstractCreature_Die;
             On.SaveState.AbstractCreatureFromString += SaveState_AbstractCreatureFromString;
             On.SaveState.AbstractCreatureToString_AbstractCreature_WorldCoordinate += SaveState_AbstractCreatureToString_AbstractCreature_WorldCoordinate;
@@ -36,6 +48,25 @@ namespace GameruleSet
 
             On.Spear.ChangeMode += Spear_ChangeMode;
             On.RegionState.AdaptRegionStateToWorld += RegionState_AdaptRegionStateToWorld;
+        }
+
+        private void Room_Loaded(On.Room.orig_Loaded orig, Room self)
+        {
+            int startIndex = self.abstractRoom.entities.Count;
+
+            orig(self);
+
+            if (self.game.IsStorySession)
+            {
+                ref var data = ref self.game.Data().Get<GameData>();
+                for (int i = startIndex; i < self.abstractRoom.entities.Count; i++)
+                {
+                    if (self.abstractRoom.entities[i] is AbstractPhysicalObject o && o is not AbstractConsumable)
+                    {
+                        data.dontSave.Add(o);
+                    }
+                }
+            }
         }
 
         private void AbstractCreature_Die(On.AbstractCreature.orig_Die orig, AbstractCreature self)
@@ -204,6 +235,8 @@ namespace GameruleSet
             if (rules.Persistence == PersistenceEnum.None)
                 return;
 
+            var gameData = self.world.game.Data().Get<GameData>();
+
             for (int i = 0; i < self.world.NumberOfRooms; i++)
             {
                 var abstractRoom = self.world.GetAbstractRoom(self.world.firstRoomIndex + i);
@@ -227,18 +260,17 @@ namespace GameruleSet
                         }
                     }
 
-                    if (o.pos.x >= 0 && o.pos.x <= abstractRoom.size.x && 
+                    if (o.pos.x >= 0 && o.pos.x <= abstractRoom.size.x &&
                         o.pos.y >= 0 && o.pos.y <= abstractRoom.size.y &&
-                        o.type != AbstractPhysicalObject.AbstractObjectType.Creature && 
-                        o.type != AbstractPhysicalObject.AbstractObjectType.KarmaFlower && 
-                        o.type != AbstractPhysicalObject.AbstractObjectType.Rock && 
-                        (o is not AbstractSpear s || o.GetType() != typeof(AbstractSpear) || s.explosive || !s.stuckInWall && o.stuckObjects.Any(s => s != null)) && 
-                        (o is not AbstractConsumable c || c.isConsumed && AbstractConsumable.IsTypeConsumable(o.type)))
+                        o.type != AbstractPhysicalObject.AbstractObjectType.Creature &&
+                        o.type != AbstractPhysicalObject.AbstractObjectType.KarmaFlower &&
+                        o.type != AbstractPhysicalObject.AbstractObjectType.Rock &&
+                        (o is not AbstractSpear s || o.GetType() != typeof(AbstractSpear) || s.explosive || !s.stuckInWall && o.stuckObjects.Any(s => s != null)) &&
+                        (o is not AbstractConsumable c || c.isConsumed && AbstractConsumable.IsTypeConsumable(o.type)) &&
+                        !gameData.dontSave.Contains(o) &&
+                        PersistenceApplies(ref room, ref rain, self.world, o.pos))
                     {
-                        if (PersistenceApplies(ref room, ref rain, self.world, o.pos))
-                        {
-                            self.savedObjects.Add(o.ToString());
-                        }
+                        self.savedObjects.Add(o.ToString());
                     }
                 }
             }

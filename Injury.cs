@@ -1,10 +1,7 @@
-﻿using Mono.Cecil.Cil;
-using MonoMod.Cil;
-using MonoMod.RuntimeDetour;
+﻿using MonoMod.RuntimeDetour;
 using RWCustom;
 using StaticTables;
 using System;
-using System.Linq;
 using UnityEngine;
 
 namespace GameruleSet
