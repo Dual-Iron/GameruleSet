@@ -211,10 +211,21 @@ namespace GameruleSet
 
             if (data.injured && self.State.alive)
             {
-                // Aerobic level decreases 20% slower
-                if (self.aerobicLevel < data.lastAerobicLevel)
-                    self.aerobicLevel -= (self.aerobicLevel - data.lastAerobicLevel) * 0.2f;
-                data.lastAerobicLevel = self.aerobicLevel;
+                if (data.injuryCooldown > 0)
+                {
+                    data.injuryCooldown--;
+                    self.aerobicLevel = 0;
+                    data.lastAerobicLevel = 0;
+                }
+                else
+                {
+                    data.injuryCooldown = 0;
+
+                    // Aerobic level decreases 20% slower
+                    if (self.aerobicLevel < data.lastAerobicLevel)
+                        self.aerobicLevel -= (self.aerobicLevel - data.lastAerobicLevel) * 0.2f;
+                    data.lastAerobicLevel = self.aerobicLevel;
+                }
 
                 if (self.Adrenaline > 0)
                 {
@@ -274,12 +285,6 @@ namespace GameruleSet
                 data.damageBlockedWithMask = 0;
             }
 
-            if (data.injured)
-            {
-                data.injuryCooldown--;
-            }
-            else data.injuryCooldown = 0;
-
             var mask = GetGraspedMask(self);
             if (mask != null && self.graphicsModule is PlayerGraphics graphics && graphics.objectLooker.currentMostInteresting is Creature creature && !creature.dead)
             {
@@ -295,6 +300,11 @@ namespace GameruleSet
 
         private static void Hurt(Player self, ref InjuryData data)
         {
+            if (data.injuryCooldown > 0)
+            {
+                return;
+            }
+
             data.painTime = maxPainTime;
             self.Stun(50 + UnityEngine.Random.Range(0, 20));
 
