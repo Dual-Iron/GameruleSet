@@ -296,7 +296,7 @@ namespace GameruleSet
         private static void Hurt(Player self, ref InjuryData data)
         {
             data.painTime = maxPainTime;
-            self.Stun(60);
+            self.Stun(50 + UnityEngine.Random.Range(0, 20));
 
             // Visuals
             self.room.PlaySound(SoundID.Slugcat_Swallow_Item, self.mainBodyChunk.pos, 1.25f, 2.2f);
