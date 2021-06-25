@@ -359,7 +359,7 @@ namespace GameruleSet
                     if (data.injuryCooldown > 0)
                     {
                         damage *= 0.5f;
-                        stunBonus += damage * 30;
+                        stunBonus += damage * 30 * 0.5f;
                     }
                     else if (!data.injured && !player.Malnourished)
                     {
@@ -370,7 +370,7 @@ namespace GameruleSet
                         if (type == Creature.DamageType.Bite)
                             stunBonus = 0;
                         else
-                            stunBonus += damage * 30;
+                            stunBonus += damage * 30 * 0.75f;
 
                         damage *= 0.25f;
                     }
