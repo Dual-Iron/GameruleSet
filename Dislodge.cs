@@ -9,15 +9,16 @@ namespace GameruleSet
 {
     public class Dislodge
     {
-        const int yank = 20;
-        const int stunDuration = 10;
-        const int maxTime = 40;
+        const float startingRipChance = 0.4f;
+        const int stunDuration = 8;
+        const int maxTime = 30;
 
         struct DislodgeAnim : IWeakData<Player>
         {
             public WeakRef<Spear> spear;
             public float time;
             public int graspUsed;
+            public float ripChance;
 
             void IWeakData<Player>.Construct(Player owner)
             {
@@ -103,7 +104,7 @@ namespace GameruleSet
                 if (data.time < maxTime - 4)
                 {
                     self.LookAtPoint(self.player.firstChunk.pos + (self.player.firstChunk.pos - pos), 20);
-                    self.blink = 5;
+                    self.blink = 10;
                 }
 
                 if (IsOnWall(self.player))
@@ -151,8 +152,8 @@ namespace GameruleSet
                         self.firstChunk.pos.y = self.room.MiddleOfTile(self.firstChunk.pos).y + 4;
                         self.firstChunk.vel = Vector2.zero;
 
-                        self.bodyChunks[0].vel -= (target - self.bodyChunks[0].pos - new Vector2(5 * -spear.rotation.x, 10)).normalized * 1.5f;
-                        self.bodyChunks[1].vel += (target - self.bodyChunks[1].pos).normalized * 2f;
+                        self.bodyChunks[0].vel -= 1.25f * (target - self.bodyChunks[0].pos - new Vector2(5 * -spear.rotation.x, 10)).normalized;
+                        self.bodyChunks[1].vel += 2f * (target - self.bodyChunks[1].pos).normalized;
 
                         var yDist = Mathf.Abs(self.bodyChunks[1].pos.y - target.y);
                         if (yDist < 1)
@@ -185,17 +186,18 @@ namespace GameruleSet
                             delta *= 0.70f;
                         }
 
-                        if (data.time > yank && data.time + delta <= yank)
-                        {
-                            FirstYank(self, spear, target);
-                        }
-
                         data.time += delta;
-                    }
-                    // Ignore special case of float.NegativeInfinity
-                    else if (data.time > float.NegativeInfinity)
-                    {
-                        RipSpear(self, ref data, spear, target);
+
+                        if (data.time <= 0)
+                        {
+                            if (UnityEngine.Random.value < data.ripChance)
+                                RipSpear(self, ref data, spear, target);
+                            else
+                                FirstYank(self, spear, target);
+
+                            data.time = maxTime;
+                            data.ripChance += 0.1f;
+                        }
                     }
                 }
             }
@@ -239,7 +241,7 @@ namespace GameruleSet
             self.bodyChunks[0].vel += dir * 6;
             self.bodyChunks[1].vel -= dir * 3;
 
-            self.AerobicIncrease(2);
+            self.AerobicIncrease(1);
         }
 
         private void RipSpear(Player self, ref DislodgeAnim data, Spear spear, Vector2 target)
@@ -268,7 +270,7 @@ namespace GameruleSet
 
             self.SlugcatGrab(spear, data.graspUsed);
 
-            self.AerobicIncrease(2);
+            self.AerobicIncrease(1);
 
             StopPulling(ref data);
         }
@@ -308,6 +310,7 @@ namespace GameruleSet
                 if (data.spear == null)
                 {
                     data.spear = new(s);
+                    data.ripChance = startingRipChance + player.slugcatStats.throwingSkill / 10f;
                     data.time = maxTime;
                     data.graspUsed = graspUsed;
                     player.animation = EnumExt_GameruleSet.PullingSpear;
