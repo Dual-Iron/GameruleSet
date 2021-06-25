@@ -355,11 +355,11 @@ namespace GameruleSet
                 {
                     player.aerobicLevel = 0;
 
-                    // Oh shit
+                    // Mitigate instant death from chained damage
                     if (data.injuryCooldown > 0)
                     {
+                        damage *= 0.5f;
                         stunBonus += damage * 30;
-                        damage = 0;
                     }
                     else if (!data.injured && !player.Malnourished)
                     {
@@ -372,7 +372,7 @@ namespace GameruleSet
                         else
                             stunBonus += damage * 30;
 
-                        damage = 0;
+                        damage *= 0.25f;
                     }
                 }
             }
