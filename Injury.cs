@@ -179,6 +179,7 @@ namespace GameruleSet
                     var mask = GetGraspedMask(player);
                     if (mask != null)
                     {
+                        mask.room.PlaySound(SoundID.Spear_Fragment_Bounce, mask.firstChunk.pos, 0.7f, 1.35f);
                         VulturePopEffect(obj.room, null, obj.bodyChunks[chunkGrabbed].pos, 0.1f, pacifying ? 45f : 0f);
                         mask.AllGraspsLetGoOfThisObject(true);
                         obj = mask;
