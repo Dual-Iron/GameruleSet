@@ -9,7 +9,7 @@ namespace GameruleSet
 {
     public class Dislodge
     {
-        const float startingRipChance = 0.4f;
+        const float startingRipChance = 1 / 3f;
         const int stunDuration = 8;
         const int maxTime = 30;
 
@@ -166,10 +166,11 @@ namespace GameruleSet
                             self.bodyChunks[1].vel.y *= 0.5f;
                         }
                     }
-                    else if (horizontal || Math.Abs(self.bodyChunks[1].pos.x - target.x) > 6)
+                    else if (horizontal || Math.Abs(self.bodyChunks[0].pos.x - target.x) > 5)
                     {
-                        self.bodyChunks[0].vel.x -= Math.Sign(target.x - self.bodyChunks[1].pos.x);
-                        self.bodyChunks[1].vel.x += Math.Sign(target.x - self.bodyChunks[1].pos.x);
+                        var v = Math.Sign(target.x - self.bodyChunks[0].pos.x);
+                        self.bodyChunks[0].vel.x -= v;
+                        self.bodyChunks[1].vel.x += v;
                     }
 
                     if (data.time > 0)
