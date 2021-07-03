@@ -24,7 +24,7 @@ namespace GameruleSet
 
         struct GameData : IWeakData<RainWorldGame>
         {
-            public HashSet<AbstractPhysicalObject> dontSave;
+            public HashSet<EntityID> dontSave;
 
             void IWeakData<RainWorldGame>.Construct(RainWorldGame key)
             {
@@ -56,14 +56,14 @@ namespace GameruleSet
 
             orig(self);
 
-            if (self.game.IsStorySession)
+            if (self.abstractRoom.world.game.IsStorySession)
             {
-                ref var data = ref self.game.Data().Get<GameData>();
+                ref var data = ref self.abstractRoom.world.game.Data().Get<GameData>();
                 for (int i = startIndex; i < self.abstractRoom.entities.Count; i++)
                 {
                     if (self.abstractRoom.entities[i] is AbstractPhysicalObject o && (o is not AbstractConsumable c || c.placedObjectIndex < 0))
                     {
-                        data.dontSave.Add(o);
+                        data.dontSave.Add(o.ID);
                     }
                 }
             }
@@ -267,7 +267,7 @@ namespace GameruleSet
                         o.type != AbstractPhysicalObject.AbstractObjectType.Rock &&
                         (o is not AbstractSpear s || o.GetType() != typeof(AbstractSpear) || s.explosive || !s.stuckInWall && o.stuckObjects.Any(s => s != null)) &&
                         (o is not AbstractConsumable c || c.isConsumed && AbstractConsumable.IsTypeConsumable(o.type)) &&
-                        !gameData.dontSave.Contains(o) &&
+                        !gameData.dontSave.Contains(o.ID) &&
                         PersistenceApplies(ref room, ref rain, self.world, o.pos))
                     {
                         self.savedObjects.Add(o.ToString());

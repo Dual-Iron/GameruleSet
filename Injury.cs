@@ -86,13 +86,19 @@ namespace GameruleSet
                 var data = self.player.playerState.Data().Get<InjuryData>();
                 if (data.injured)
                 {
-                    if (self.malnourished < 1)
+                    if (self.malnourished < 0.75f)
                         self.malnourished += 0.01f;
 
                     if (self.player.State.alive)
                     {
                         if (data.painTime > 0)
                         {
+                            if (self.markAlpha > 0)
+                            {
+                                self.markAlpha += (UnityEngine.Random.value - 0.5f) * data.painTime / maxPainTime;
+                                self.markAlpha = Mathf.Clamp01(self.markAlpha);
+                            }
+
                             self.objectLooker.lookAtPoint = null;
                             self.objectLooker.LookAtNothing();
                         }
@@ -264,6 +270,27 @@ namespace GameruleSet
                     self.standing = false;
                     self.slowMovementStun = Math.Max(self.slowMovementStun, 3 + (int)(5f * data.painTime / maxPainTime));
 
+                    if (self.bodyMode == Player.BodyModeIndex.ClimbingOnBeam)
+                    {
+                        self.bodyChunks[1].vel.y -= 0.2f;
+                    }
+
+                    if (self.animation == Player.AnimationIndex.GetUpOnBeam)
+                    {
+                        self.bodyChunks[1].vel *= 0.65f;
+
+                        if (self.bodyChunks[1].pos.y > self.bodyChunks[0].pos.y - 6)
+                        {
+                            self.animation = Player.AnimationIndex.HangFromBeam;
+                            self.AerobicIncrease(1f);
+                        }
+                    }
+
+                    if (self.animation == Player.AnimationIndex.BeamTip || self.animation == Player.AnimationIndex.StandOnBeam)
+                    {
+                        self.animation = Player.AnimationIndex.None;
+                    }
+
                     if (self.aerobicLevel < 0.4f)
                     {
                         data.painTime -= self.Adrenaline > 0 ? 3 : 1;
@@ -354,12 +381,13 @@ namespace GameruleSet
                 }
                 else if (damage >= self.Template.instantDeathDamageLimit)
                 {
+                    data.lastAerobicLevel = 0;
                     player.aerobicLevel = 0;
 
                     // Mitigate instant death from chained damage
                     if (data.injuryCooldown > 0)
                     {
-                        damage *= 0.5f;
+                        damage *= 0.75f;
                         stunBonus += damage * 30 * 0.5f;
                     }
                     else if (!data.injured && !player.Malnourished)
@@ -373,7 +401,7 @@ namespace GameruleSet
                         else
                             stunBonus += damage * 30 * 0.75f;
 
-                        damage *= 0.25f;
+                        damage *= 0.5f;
                     }
                 }
             }

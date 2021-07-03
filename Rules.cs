@@ -23,6 +23,7 @@ namespace GameruleSet
         public BoolRule SaveShelterPositions { get; }
         public FloatRule CycleLength { get; }
         public BoolRule SleepAnywhere { get; }
+        public BoolRule ShareGrasps { get; }
 
         internal Rules(ManualLogSource logger)
         {
@@ -54,6 +55,8 @@ namespace GameruleSet
 
             SleepAnywhere = new BoolRule(false) { ID = "sleep_anywhere", Description = "Lets you sleep anywhere by holding crouch on a solid, flat surface. May not work correctly if 'save_shelter_positions' is false." };
 
+            ShareGrasps = new BoolRule(false) { ID = "share_grasps", Description = "Lets creatures grab different parts of the same object. For example, two players can hold different parts of the same dead centipede." };
+
             new Injury(this);
             new Imbalanced(this);
             new Corpulent(this);
@@ -63,6 +66,7 @@ namespace GameruleSet
             new CycleLength(this);
             new SaveShelterPositions(this);
             new SleepAnywhere(this);
+            new ShareGrasps(this);
         }
     }
 }
