@@ -229,7 +229,7 @@ namespace GameruleSet
             if (IsOnWall(self))
                 self.room.PlaySound(SoundID.Slugcat_Normal_Jump, self.mainBodyChunk);
 
-            int num = UnityEngine.Random.Range(1, 3);
+            int num = UnityEngine.Random.Range(0, 3);
             for (int i = 0; i < num; i++)
             {
                 var splashDir = -spear.rotation.normalized + Custom.DegToVec(UnityEngine.Random.value * 90 - 45);
@@ -247,7 +247,7 @@ namespace GameruleSet
 
         private void RipSpear(Player self, ref DislodgeAnim data, Spear spear, Vector2 target)
         {
-            int num = UnityEngine.Random.Range(3, 6);
+            int num = UnityEngine.Random.Range(1, 4);
             for (int i = 0; i < num; i++)
             {
                 var splashDir = -spear.rotation.normalized + Custom.DegToVec(UnityEngine.Random.value * 120 - 60);
