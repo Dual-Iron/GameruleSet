@@ -8,7 +8,7 @@ namespace GameruleSet
 {
     public class Injury
     {
-        private const int maxPainTime = 80;
+        private const int maxPainTime = 60;
 
         struct InjuryData : IWeakData<PlayerState>
         {
@@ -67,7 +67,7 @@ namespace GameruleSet
                 if (average > 0)
                 {
                     average /= count;
-                    return orig(self) * Mathf.Lerp(1f, 0.5f, average / maxPainTime);
+                    return orig(self) * Mathf.Lerp(1f, 0.4f, average / maxPainTime);
                 }
             }
             return orig(self);
@@ -155,9 +155,9 @@ namespace GameruleSet
 
         private void Player_Stun(On.Player.orig_Stun orig, Player self, int st)
         {
-            if (st > 0 && rules.Injury && self.playerState.Data().Get<InjuryData>().injured)
+            if (st > 10 && st > self.stun && rules.Injury && self.playerState.Data().Get<InjuryData>().injured)
             {
-                self.aerobicLevel = Mathf.Clamp(self.aerobicLevel + st / 100f, 0, 1);
+                self.aerobicLevel = Mathf.Clamp01(self.aerobicLevel + st / 100f);
             }
             orig(self, st);
         }
@@ -218,89 +218,10 @@ namespace GameruleSet
 
             if (data.injured && self.State.alive)
             {
-                if (data.injuryCooldown > 0)
-                {
-                    data.injuryCooldown--;
-                    self.aerobicLevel = 0;
-                    data.lastAerobicLevel = 0;
-                }
-                else
-                {
-                    data.injuryCooldown = 0;
-
-                    // Aerobic level decreases 20% slower
-                    if (self.aerobicLevel < data.lastAerobicLevel)
-                        self.aerobicLevel -= (self.aerobicLevel - data.lastAerobicLevel) * 0.2f;
-                    data.lastAerobicLevel = self.aerobicLevel;
-                }
-
-                if (self.Adrenaline > 0)
-                {
-                    self.aerobicLevel = 0;
-                    data.usedPainkiller = true;
-                }
-                else if (data.usedPainkiller)
-                {
-                    data.usedPainkiller = false;
-                    self.aerobicLevel = 1;
-                }
-                else
-                {
-                    self.slowMovementStun = Math.Max(self.slowMovementStun, (int)(5f * self.aerobicLevel));
-                }
-
-                // If exhausted, experience pain
-                if (self.aerobicLevel >= 1 && data.painTime == 0 || data.shouldPain)
-                {
-                    data.shouldPain = false;
-                    Hurt(self, ref data);
-                }
-
-                // Forewarn pain
-                if (self.aerobicLevel >= 0.68f)
-                    self.Blink(2);
-
-                // Twinge of pain
-                if (self.aerobicLevel >= 0.85f)
-                    self.standing = false;
-
-                // Agony
-                if (data.painTime > 0)
-                {
-                    self.standing = false;
-                    self.slowMovementStun = Math.Max(self.slowMovementStun, 3 + (int)(5f * data.painTime / maxPainTime));
-
-                    if (self.bodyMode == Player.BodyModeIndex.ClimbingOnBeam)
-                    {
-                        self.bodyChunks[1].vel.y -= 0.2f;
-                    }
-
-                    if (self.animation == Player.AnimationIndex.GetUpOnBeam)
-                    {
-                        self.bodyChunks[1].vel *= 0.65f;
-
-                        if (self.bodyChunks[1].pos.y > self.bodyChunks[0].pos.y - 6)
-                        {
-                            self.animation = Player.AnimationIndex.HangFromBeam;
-                            self.AerobicIncrease(1f);
-                        }
-                    }
-
-                    if (self.animation == Player.AnimationIndex.BeamTip || self.animation == Player.AnimationIndex.StandOnBeam)
-                    {
-                        self.animation = Player.AnimationIndex.None;
-                    }
-
-                    if (self.aerobicLevel < 0.4f)
-                    {
-                        data.painTime -= self.Adrenaline > 0 ? 3 : 1;
-
-                        if (UnityEngine.Random.value < 0.18)
-                            self.Blink(5);
-                    }
-                    else self.Blink(5);
-                }
+                InjuredUpdate(self, ref data);
             }
+
+            data.lastAerobicLevel = self.aerobicLevel;
 
             orig(self, eu);
 
@@ -326,6 +247,90 @@ namespace GameruleSet
             else data.danger = 0;
         }
 
+        private static InjuryData InjuredUpdate(Player self, ref InjuryData data)
+        {
+            if (data.injuryCooldown > 0)
+            {
+                data.injuryCooldown--;
+                self.aerobicLevel = 0;
+                data.lastAerobicLevel = 0;
+            }
+            else
+            {
+                data.injuryCooldown = 0;
+
+                // Aerobic level decreases 25% slower
+                if (self.aerobicLevel < data.lastAerobicLevel)
+                    self.aerobicLevel -= (self.aerobicLevel - data.lastAerobicLevel) * 0.25f;
+            }
+
+            if (self.Adrenaline > 0)
+            {
+                self.aerobicLevel = 0;
+                data.usedPainkiller = true;
+            }
+            else if (data.usedPainkiller)
+            {
+                data.usedPainkiller = false;
+                self.aerobicLevel = 1;
+            }
+            else
+            {
+                self.slowMovementStun = Math.Max(self.slowMovementStun, (int)(6f * self.aerobicLevel));
+            }
+
+            // If exhausted, experience pain
+            if (self.aerobicLevel >= 1 && data.painTime == 0 || data.shouldPain)
+            {
+                data.shouldPain = false;
+                Hurt(self, ref data);
+            }
+
+            // Forewarn pain
+            if (self.aerobicLevel >= 0.68f)
+                self.Blink(2);
+
+            bool troubleStanding = false;
+
+            // Twinge of pain
+            if (self.aerobicLevel >= 0.85f)
+            {
+                troubleStanding = true;
+            }
+
+            // Agony
+            if (data.painTime > 0)
+            {
+                troubleStanding = true;
+
+                self.slowMovementStun = Math.Max(self.slowMovementStun, (int)(10f * self.aerobicLevel));
+
+                if (self.animation == Player.AnimationIndex.GetUpOnBeam)
+                {
+                    self.bodyChunks[1].vel *= 0.8f;
+                }
+
+                if (self.aerobicLevel < 0.4f)
+                {
+                    data.painTime -= self.Adrenaline > 0 ? 3 : 1;
+
+                    if (UnityEngine.Random.value < 0.18)
+                        self.Blink(5);
+                }
+                else self.Blink(5);
+            }
+
+            data.painTime = Math.Max(data.painTime, 0);
+
+            if (troubleStanding && self.stun == 0 && self.animation != Player.AnimationIndex.HangFromBeam &&
+                self.standing && UnityEngine.Random.value < 0.03f)
+            {
+                self.Stun(self.bodyMode == Player.BodyModeIndex.Stand ? 15 : 5);
+            }
+
+            return data;
+        }
+
         private static void Hurt(Player self, ref InjuryData data)
         {
             if (data.injuryCooldown > 0)
@@ -334,7 +339,7 @@ namespace GameruleSet
             }
 
             data.painTime = maxPainTime;
-            self.Stun(50 + UnityEngine.Random.Range(0, 20));
+            self.Stun(50 + UnityEngine.Random.Range(0, 21));
 
             // Visuals
             self.room.PlaySound(SoundID.Slugcat_Swallow_Item, self.mainBodyChunk.pos, 1.25f, 2.2f);
@@ -387,8 +392,8 @@ namespace GameruleSet
                     // Mitigate instant death from chained damage
                     if (data.injuryCooldown > 0)
                     {
-                        damage *= 0.75f;
                         stunBonus += damage * 30 * 0.5f;
+                        damage *= 0.5f;
                     }
                     else if (!data.injured && !player.Malnourished)
                     {
@@ -399,7 +404,7 @@ namespace GameruleSet
                         if (type == Creature.DamageType.Bite)
                             stunBonus = 0;
                         else
-                            stunBonus += damage * 30 * 0.75f;
+                            stunBonus += damage * 30 * 0.5f;
 
                         damage *= 0.5f;
                     }
