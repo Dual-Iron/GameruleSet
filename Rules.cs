@@ -24,6 +24,7 @@ namespace GameruleSet
         public FloatRule CycleLength { get; }
         public BoolRule SleepAnywhere { get; }
         public BoolRule ShareGrasps { get; }
+        public BoolRule HandHolding { get; }
 
         internal Rules(ManualLogSource logger)
         {
@@ -57,6 +58,8 @@ namespace GameruleSet
 
             ShareGrasps = new BoolRule(false) { ID = "share_grasps", Description = "Lets creatures grab different parts of the same object. For example, two players can hold different parts of the same dead centipede." };
 
+            HandHolding = new BoolRule(false) { ID = "hand_holding", Description = "Lets you hold the hand of scavengers, iterators, and slugcats by just grabbing them." };
+
             new Injury(this);
             new Imbalanced(this);
             new Corpulent(this);
@@ -67,6 +70,7 @@ namespace GameruleSet
             new SaveShelterPositions(this);
             new SleepAnywhere(this);
             new ShareGrasps(this);
+            new HandHolding(this);
         }
     }
 }
