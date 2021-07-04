@@ -234,7 +234,7 @@ namespace GameruleSet
             {
                 var splashDir = -spear.rotation.normalized + Custom.DegToVec(UnityEngine.Random.value * 90 - 45);
                 var pos = target + splashDir * 3f;
-                var speed = UnityEngine.Random.value * 4;
+                var speed = UnityEngine.Random.value * 5;
                 self.room.AddObject(new WaterDrip(pos, splashDir * speed, true));
             }
 
@@ -252,7 +252,7 @@ namespace GameruleSet
             {
                 var splashDir = -spear.rotation.normalized + Custom.DegToVec(UnityEngine.Random.value * 120 - 60);
                 var pos = target + splashDir * 4f;
-                var speed = 1 + UnityEngine.Random.value * 6;
+                var speed = 1 + UnityEngine.Random.value * 5;
                 self.room.AddObject(new WaterDrip(pos, splashDir * speed, true));
             }
 

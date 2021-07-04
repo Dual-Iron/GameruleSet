@@ -349,7 +349,7 @@ namespace GameruleSet
                 var dir = self.bodyChunks[1].Rotation.GetAngle() + data.woundDir - 90 + UnityEngine.Random.value * 30 - 15;
                 var pos = self.bodyChunks[1].pos + Custom.DegToVec(dir) * self.bodyChunks[1].rad * 0.75f;
                 var direction = Custom.DegToVec(dir);
-                var speed = 5 + UnityEngine.Random.value * 7;
+                var speed = 4 + UnityEngine.Random.value * 8;
                 self.room.AddObject(new WaterDrip(pos, direction * speed, false));
             }
         }
