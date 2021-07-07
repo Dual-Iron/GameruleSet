@@ -259,9 +259,9 @@ namespace GameruleSet
             {
                 data.injuryCooldown = 0;
 
-                // Aerobic level decreases 25% slower
+                // Aerobic level decreases 20% slower
                 if (self.aerobicLevel < data.lastAerobicLevel)
-                    self.aerobicLevel -= (self.aerobicLevel - data.lastAerobicLevel) * 0.25f;
+                    self.aerobicLevel -= (self.aerobicLevel - data.lastAerobicLevel) * 0.2f;
             }
 
             if (self.Adrenaline > 0)
@@ -408,6 +408,9 @@ namespace GameruleSet
 
                         damage *= 0.5f;
                     }
+
+                    if (player.Adrenaline > 0)
+                        stunBonus /= 3;
                 }
             }
             orig(self, source, directionAndMomentum, hitChunk, hitAppendage, type, damage, stunBonus);

@@ -146,12 +146,10 @@ namespace GameruleSet
                 // If too far from any of the spear's body chunks, plop off
                 if ((spear.bodyChunks[0].pos - self.firstChunk.pos).sqrMagnitude > 35 * 35)
                 {
-                    self.room.PlaySound(SoundID.Spear_Stick_In_Wall, spear.firstChunk.pos, 1.2f, 1.1f);
+                    RipSpear(self, ref data, spear, target);
                     self.animation = Player.AnimationIndex.None;
                     self.bodyMode = Stunned;
-                    self.SlugcatGrab(spear, data.graspUsed);
-                    self.Stun(60);
-                    StopPulling(ref data);
+                    self.Stun(40);
                 }
                 else
                 {

@@ -36,7 +36,7 @@ namespace GameruleSet
 
         private static bool RefuseHandHolding(ScavengerAI self, Player p)
         {
-            return self.scared > 0.95f && self.threatTracker.Utility() > 0.95f || self.CurrentPlayerAggression(p.abstractCreature) > 0.05f;
+            return self.scared > 0.95f && self.threatTracker.Utility() > 0.95f || self.CurrentPlayerAggression(p.abstractCreature) > 0.1f;
         }
 
         private bool ignoreGrabGuard;
@@ -50,7 +50,7 @@ namespace GameruleSet
 
             static bool get_goThroughFloors(Func<BodyChunk, bool> orig, BodyChunk self)
             {
-                return orig(self) && (self.privGoThroughFloors || self.owner.grabbedBy.Any(g => !CanHoldHand(g?.grabbed)));
+                return orig(self) && (self.privGoThroughFloors || self.owner.grabbedBy.Any(g => !CanHoldHand(g?.grabber)));
             }
 
             IL.Scavenger.MidRangeUpdate += Scavenger_MidRangeUpdate;
@@ -240,11 +240,6 @@ namespace GameruleSet
                         TryGiveWeapon(self, p);
                     }
 
-                    if (Vector2.Distance(self.scavenger.firstChunk.pos, p.firstChunk.pos) < 40)
-                    {
-                        continue;
-                    }
-
                     var offset = 50 * new Vector2(p.input[0].x, p.input[0].y).normalized;
                     if (offset != default)
                         grasp.Data().Get<GraspData>().prevOffset = offset;
@@ -253,7 +248,9 @@ namespace GameruleSet
 
                     var tileStanding = p.room.GetTile(p.bodyChunks[1].pos + p.bodyChunks[1].ContactPoint.ToVector2() * 20);
 
-                    var pos = tileStanding.Solid || tileStanding.AnyBeam ? p.bodyChunks[1].pos : p.bodyChunks[0].pos;
+                    var pos = tileStanding.Terrain == Room.Tile.TerrainType.Floor || tileStanding.Terrain == Room.Tile.TerrainType.Slope || 
+                        tileStanding.Solid || tileStanding.AnyBeam ? p.bodyChunks[1].pos : p.bodyChunks[0].pos;
+
                     var tileOffsetPos = SharedPhysics.RayTraceTilesForTerrainReturnFirstSolid(p.room, pos, pos + offset);
                     if (tileOffsetPos != null && !self.pathFinder.CoordinateReachable(p.room.GetWorldCoordinate(tileOffsetPos.Value)))
                         tileOffsetPos = p.room.GetTilePosition(pos);
@@ -333,7 +330,7 @@ namespace GameruleSet
                     {
                         self.spearPosAdd = default;
                         self.mode = Limb.Mode.HuntAbsolutePosition;
-                        self.absoluteHuntPos = g.hands[grasp.graspUsed].pos;
+                        self.pos = self.absoluteHuntPos = g.hands[grasp.graspUsed].pos;
                         self.huntSpeed = 100;
                         self.quickness = 1;
                         break;
@@ -391,7 +388,9 @@ namespace GameruleSet
 
             if (self.owner.owner is Player player)
             {
-                if (self.limbNumber == player.FreeHand() && self.owner is PlayerGraphics g && WannaHoldHands(player) && CanHoldHand(g.objectLooker.currentMostInteresting))
+                if (self.limbNumber == player.FreeHand() && self.owner is PlayerGraphics g && 
+                    WannaHoldHands(player) && CanHoldHand(g.objectLooker.currentMostInteresting) &&
+                    (g.objectLooker.currentMostInteresting is not Scavenger s || !RefuseHandHolding(s.AI, player)))
                 {
                     self.mode = Limb.Mode.HuntRelativePosition;
                     self.retractCounter = 0;
