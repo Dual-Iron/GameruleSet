@@ -36,7 +36,7 @@ namespace GameruleSet
 
         private static bool RefuseHandHolding(ScavengerAI self, Player p)
         {
-            return self.CurrentPlayerAggression(p.abstractCreature) > 0.1f;
+            return self.threatTracker.Utility() > 0.95f || self.CurrentPlayerAggression(p.abstractCreature) > 0.05f;
         }
 
         private bool ignoreGrabGuard;
@@ -55,6 +55,7 @@ namespace GameruleSet
 
             IL.Scavenger.MidRangeUpdate += Scavenger_MidRangeUpdate;
             On.Weapon.HitThisObject += Weapon_HitThisObject;
+            On.Creature.LoseAllGrasps += Creature_LoseAllGrasps;
             On.Scavenger.Update += Scavenger_Update;
             On.ScavengerAI.Update += ScavengerAI_Update;
             On.ScavengerGraphics.ScavengerHand.Update += ScavengerHand_Update;
@@ -74,6 +75,16 @@ namespace GameruleSet
             On.Player.HeavyCarry += Player_HeavyCarry;
             On.Player.Grabability += Player_Grabability;
             this.rules = rules;
+        }
+
+        private void Creature_LoseAllGrasps(On.Creature.orig_LoseAllGrasps orig, Creature self)
+        {
+            orig(self);
+
+            if (CanHoldHand(self) && self is not Player)
+                for (int i = self.grabbedBy.Count - 1; i >= 0; i--)
+                    if (CanHoldHand(self.grabbedBy[i].grabber))
+                        self.grabbedBy[i].Release();
         }
 
         private void Scavenger_MidRangeUpdate(ILContext il)
@@ -211,19 +222,19 @@ namespace GameruleSet
 
                     if (rel.tempLike < 0.5f)
                     {
-                        rel.InfluenceTempLike(speed * 0.8f * (1 - self.creature.personality.dominance));
+                        rel.InfluenceTempLike(speed * 0.8f * self.creature.personality.sympathy);
                         rel.tempLike = Mathf.Min(rel.tempLike, 0.5f);
                     }
 
                     if (rel.like < 0.2f)
                     {
-                        rel.InfluenceLike(speed * 0.2f * (1 - self.creature.personality.dominance));
+                        rel.InfluenceLike(speed * 0.2f * self.creature.personality.sympathy);
                         rel.like = Mathf.Min(rel.like, 0.2f);
                     }
 
                     self.agitation = Mathf.Clamp01(Mathf.Lerp(self.agitation, 0, calmSpeed * rel.like));
 
-                    if (rel.like > 0.19f && rel.tempLike > 0.49f)
+                    if (rel.like > 0.1f && UnityEngine.Random.value < 1 / 80f && self.threatTracker.Utility() > 1f - self.creature.personality.sympathy)
                     {
                         TryGiveSpear(self, p);
                     }
@@ -258,8 +269,8 @@ namespace GameruleSet
 
         private void TryGiveSpear(ScavengerAI self, Player p)
         {
-            if (self.scavenger.animation?.id == Scavenger.ScavengerAnimation.ID.Throw ||
-                self.scavenger.animation?.id == Scavenger.ScavengerAnimation.ID.ThrowCharge)
+            var freeHand = p.FreeHand();
+            if (freeHand == -1)
                 return;
 
             var weapons = 0;
@@ -272,9 +283,16 @@ namespace GameruleSet
                 }
             }
 
-            foreach (var grasp in self.scavenger.grasps)
+            int giveGrasp = -1;
+            int minScore = int.MaxValue;
+
+            for (int i = 0; i < self.scavenger.grasps.Length; i++)
             {
-                if (grasp?.grabbed == null || weapons <= 1 && self.NeedAWeapon)
+                var grasp = self.scavenger.grasps[i];
+                if (grasp?.grabbed == null)
+                    continue;
+
+                if (weapons <= 1 && self.NeedAWeapon && self.RealWeapon(grasp.grabbed))
                     continue;
 
                 ignoreGrabGuard = true;
@@ -283,23 +301,23 @@ namespace GameruleSet
                 if (!canPickup)
                     continue;
 
-                var freeHand = p.FreeHand();
-                if (freeHand == -1)
-                    continue;
-
                 var score = self.WeaponScore(grasp.grabbed, false);
                 if (score <= 1)
                     continue;
 
-                var chanceGive = Mathf.Max(self.scared, self.agitation) / score / 40f * (1 - self.creature.personality.dominance);
-
-                if (UnityEngine.Random.value < chanceGive)
+                if (minScore > score)
                 {
-                    grasp.Release();
-                    p.SlugcatGrab(grasp.grabbed, freeHand);
-                    p.room.PlaySound(SoundID.Slugcat_Pick_Up_Spear, p.firstChunk);
-                    break;
+                    minScore = score;
+                    giveGrasp = i;
                 }
+            }
+
+            if (giveGrasp != -1)
+            {
+                var obj = self.scavenger.grasps[giveGrasp].grabbed;
+                self.scavenger.grasps[giveGrasp].Release();
+                p.SlugcatGrab(obj, freeHand);
+                p.room.PlaySound(SoundID.Slugcat_Pick_Up_Spear, p.firstChunk);
             }
         }
 
@@ -314,7 +332,7 @@ namespace GameruleSet
                     {
                         self.spearPosAdd = default;
                         self.mode = Limb.Mode.HuntAbsolutePosition;
-                        self.pos = self.absoluteHuntPos = g.hands[grasp.graspUsed].pos;
+                        self.absoluteHuntPos = g.hands[grasp.graspUsed].pos;
                         self.huntSpeed = 100;
                         self.quickness = 1;
                         break;
@@ -390,6 +408,9 @@ namespace GameruleSet
                         self.absoluteHuntPos = pos;
                         self.huntSpeed = 100f;
                         self.quickness = 1f;
+
+                        if (player.grasps[self.limbNumber].grabbed is not Scavenger)
+                            self.pos = self.absoluteHuntPos;
                     }
                 }
             }
@@ -484,7 +505,7 @@ namespace GameruleSet
 
             Vector2 dir = (otherChunk.pos - self.mainBodyChunk.pos).normalized;
             float dist = (otherChunk.pos - self.mainBodyChunk.pos).magnitude;
-            float edgeRad = grasp.grabbed is Scavenger ? 70 : 35;
+            float edgeRad = grasp.grabbed is Scavenger ? 65 : 35;
             float asymmetry = self.enteringShortCut != null ? 0 : otherChunk.mass / (self.mainBodyChunk.mass + otherChunk.mass);
 
             if (dist > edgeRad)
