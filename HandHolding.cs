@@ -36,7 +36,7 @@ namespace GameruleSet
 
         private static bool RefuseHandHolding(ScavengerAI self, Player p)
         {
-            return self.threatTracker.Utility() > 0.95f || self.CurrentPlayerAggression(p.abstractCreature) > 0.05f;
+            return self.scared > 0.95f && self.threatTracker.Utility() > 0.95f || self.CurrentPlayerAggression(p.abstractCreature) > 0.05f;
         }
 
         private bool ignoreGrabGuard;
@@ -222,24 +222,25 @@ namespace GameruleSet
 
                     if (rel.tempLike < 0.5f)
                     {
-                        rel.InfluenceTempLike(speed * 0.8f * self.creature.personality.sympathy);
+                        rel.InfluenceTempLike(speed * 0.75f * self.creature.personality.sympathy);
                         rel.tempLike = Mathf.Min(rel.tempLike, 0.5f);
                     }
 
-                    if (rel.like < 0.2f)
+                    if (rel.like < 0.25f)
                     {
-                        rel.InfluenceLike(speed * 0.2f * self.creature.personality.sympathy);
-                        rel.like = Mathf.Min(rel.like, 0.2f);
+                        rel.InfluenceLike(speed * 0.25f * self.creature.personality.sympathy);
+                        rel.like = Mathf.Min(rel.like, 0.25f);
                     }
 
                     self.agitation = Mathf.Clamp01(Mathf.Lerp(self.agitation, 0, calmSpeed * rel.like));
 
-                    if (rel.like > 0.1f && UnityEngine.Random.value < 1 / 80f && self.threatTracker.Utility() > 1f - self.creature.personality.sympathy)
+                    if (rel.like > 0.2f && rel.tempLike > 0.45f && 
+                        UnityEngine.Random.value < 1 / 80f && self.threatTracker.Utility() > 1f - self.creature.personality.sympathy)
                     {
-                        TryGiveSpear(self, p);
+                        TryGiveWeapon(self, p);
                     }
 
-                    if (Vector2.Distance(self.scavenger.firstChunk.pos, p.firstChunk.pos) < 30)
+                    if (Vector2.Distance(self.scavenger.firstChunk.pos, p.firstChunk.pos) < 40)
                     {
                         continue;
                     }
@@ -267,7 +268,7 @@ namespace GameruleSet
             }
         }
 
-        private void TryGiveSpear(ScavengerAI self, Player p)
+        private void TryGiveWeapon(ScavengerAI self, Player p)
         {
             var freeHand = p.FreeHand();
             if (freeHand == -1)
