@@ -86,7 +86,7 @@ namespace GameruleSet
                 var data = self.player.playerState.Data().Get<InjuryData>();
                 if (data.injured)
                 {
-                    if (self.malnourished < 0.75f)
+                    if (self.malnourished < 0.6f)
                         self.malnourished += 0.01f;
 
                     if (self.player.State.alive)
@@ -105,7 +105,7 @@ namespace GameruleSet
 
                         if (!self.player.lungsExhausted && !self.player.exhausted)
                         {
-                            self.breath += 1 / 50f;
+                            self.breath += 1 / 75f;
                             self.player.swimCycle += 0.05f * self.player.aerobicLevel;
 
                             if (self.player.stun <= 0)

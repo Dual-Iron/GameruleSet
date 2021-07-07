@@ -59,6 +59,11 @@ namespace GameruleSet
                 {
                     for (int i = 0; i < 2; i++)
                     {
+                        if (self.player.grasps[i] != null)
+                        {
+                            continue;
+                        }
+
                         // Use HangFromBeam hands
                         var vector7 = Vector2.Lerp(self.hands[i].lastPos, self.hands[i].pos, timeStacker);
                         sLeaser.sprites[7 + i].element = Futile.atlasManager.GetElementWithName("OnTopOfTerrainHand2");
@@ -114,6 +119,11 @@ namespace GameruleSet
 
                 for (int i = 0; i < 2; i++)
                 {
+                    if (self.player.grasps[i] != null)
+                    {
+                        continue;
+                    }
+
                     self.hands[i].mode = Limb.Mode.HuntAbsolutePosition;
                     self.hands[i].absoluteHuntPos = pos - spear.rotation * 8 * i;
                     self.hands[i].pos = self.hands[i].absoluteHuntPos;
