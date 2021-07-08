@@ -26,7 +26,7 @@ namespace GameruleSet
         private static bool CanHoldHand(PhysicalObject? o)
         {
             return Rules.CurrentRules!.HandHolding && 
-                (o is Oracle || o is Player p && p.State.alive || o is Scavenger s && s.State.alive);
+                (o is Oracle || o is Player p && p.State.alive || o is Scavenger s && s.State.alive && s.stun <= 0);
         }
 
         private static bool WannaHoldHands(Player player)
@@ -53,9 +53,10 @@ namespace GameruleSet
                 return orig(self) && (self.privGoThroughFloors || self.owner.grabbedBy.Any(g => !CanHoldHand(g?.grabber)));
             }
 
+            On.Scavenger.Update += Scavenger_Update1;
+            On.Creature.Die += Creature_Die;
             IL.Scavenger.MidRangeUpdate += Scavenger_MidRangeUpdate;
             On.Weapon.HitThisObject += Weapon_HitThisObject;
-            On.Creature.LoseAllGrasps += Creature_LoseAllGrasps;
             On.Scavenger.Update += Scavenger_Update;
             On.ScavengerAI.Update += ScavengerAI_Update;
             On.ScavengerGraphics.ScavengerHand.Update += ScavengerHand_Update;
@@ -77,14 +78,33 @@ namespace GameruleSet
             this.rules = rules;
         }
 
-        private void Creature_LoseAllGrasps(On.Creature.orig_LoseAllGrasps orig, Creature self)
+        private void Scavenger_Update1(On.Scavenger.orig_Update orig, Scavenger self, bool eu)
+        {
+            orig(self, eu);
+
+            if (self.stun > 0 && self.State.alive)
+            {
+                DropHands(self);
+            }
+        }
+
+        private void Creature_Die(On.Creature.orig_Die orig, Creature self)
         {
             orig(self);
 
-            if (CanHoldHand(self) && self is not Player)
-                for (int i = self.grabbedBy.Count - 1; i >= 0; i--)
-                    if (CanHoldHand(self.grabbedBy[i].grabber))
-                        self.grabbedBy[i].Release();
+            if (self is Scavenger s)
+                DropHands(s);
+        }
+
+        private void DropHands(Scavenger s)
+        {
+            for (int i = s.grabbedBy.Count - 1; i >= 0; i--)
+            {
+                if (CanHoldHand(s.grabbedBy[i].grabber))
+                {
+                    s.grabbedBy[i].Release();
+                }
+            }
         }
 
         private void Scavenger_MidRangeUpdate(ILContext il)
@@ -214,28 +234,29 @@ namespace GameruleSet
                         continue;
                     }
 
-                    const float speed = 0.001f;
+                    const float likeSpeed = 0.001f;
                     const float calmSpeed = 0.05f;
 
                     var rel = self.creature.state.socialMemory.GetOrInitiateRelationship(p.abstractCreature.ID);
-                    rel.InfluenceKnow(speed);
+                    rel.InfluenceKnow(likeSpeed);
 
                     if (rel.tempLike < 0.5f)
                     {
-                        rel.InfluenceTempLike(speed * 0.75f * self.creature.personality.sympathy);
+                        rel.InfluenceTempLike(likeSpeed * 0.75f * self.creature.personality.sympathy);
                         rel.tempLike = Mathf.Min(rel.tempLike, 0.5f);
                     }
 
                     if (rel.like < 0.25f)
                     {
-                        rel.InfluenceLike(speed * 0.25f * self.creature.personality.sympathy);
+                        rel.InfluenceLike(likeSpeed * 0.25f * self.creature.personality.sympathy);
                         rel.like = Mathf.Min(rel.like, 0.25f);
                     }
 
                     self.agitation = Mathf.Clamp01(Mathf.Lerp(self.agitation, 0, calmSpeed * rel.like));
+                    self.scared = Mathf.Clamp01(Mathf.Lerp(self.scared, 0, calmSpeed * rel.like));
 
                     if (rel.like > 0.2f && rel.tempLike > 0.45f && 
-                        UnityEngine.Random.value < 1 / 80f && self.threatTracker.Utility() > 1f - self.creature.personality.sympathy)
+                        UnityEngine.Random.value < 1 / 20f && self.threatTracker.Utility() > 1f - self.creature.personality.sympathy)
                     {
                         TryGiveWeapon(self, p);
                     }

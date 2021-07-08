@@ -71,6 +71,7 @@ namespace GameruleSet
             new SleepAnywhere(this);
             new ShareGrasps(this);
             new HandHolding(this);
+            new RideableLizards(this);
         }
     }
 }
