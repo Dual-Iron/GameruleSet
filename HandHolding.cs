@@ -80,20 +80,20 @@ namespace GameruleSet
 
         private void Scavenger_Update1(On.Scavenger.orig_Update orig, Scavenger self, bool eu)
         {
-            orig(self, eu);
-
             if (self.stun > 0 && self.State.alive)
             {
                 DropHands(self);
             }
+
+            orig(self, eu);
         }
 
         private void Creature_Die(On.Creature.orig_Die orig, Creature self)
         {
-            orig(self);
-
             if (self is Scavenger s)
                 DropHands(s);
+
+            orig(self);
         }
 
         private void DropHands(Scavenger s)
