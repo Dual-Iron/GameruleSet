@@ -214,7 +214,6 @@ namespace GameruleSet
                 self.swingingForbidden = 10;
             }
         }
-    }
 
         private void ScavengerAI_Update(On.ScavengerAI.orig_Update orig, ScavengerAI self)
         {
