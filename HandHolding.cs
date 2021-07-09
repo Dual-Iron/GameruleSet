@@ -208,14 +208,10 @@ namespace GameruleSet
         {
             orig(self, eu);
 
-            foreach (var grasp in self.grabbedBy)
+            if (!self.grabbedBy.Any(g => !CanHoldHand(g.grabber)))
             {
-                if (CanHoldHand(grasp.grabber))
-                {
-                    self.grabbedAttackCounter = 0;
-                    self.swingingForbidden = 10;
-                    break;
-                }
+                self.grabbedAttackCounter = 0;
+                self.swingingForbidden = 10;
             }
         }
 
@@ -426,12 +422,9 @@ namespace GameruleSet
                     {
                         self.mode = Limb.Mode.HuntAbsolutePosition;
                         self.retractCounter = 0;
-                        self.absoluteHuntPos = pos;
+                        self.pos = pos;
                         self.huntSpeed = 100f;
                         self.quickness = 1f;
-
-                        if (player.grasps[self.limbNumber].grabbed is not Scavenger)
-                            self.pos = self.absoluteHuntPos;
                     }
                 }
             }
@@ -550,7 +543,7 @@ namespace GameruleSet
             }
             data.lax = Mathf.Clamp01(data.lax);
 
-            Vector2 midpoint = Vector2.Lerp(self.mainBodyChunk.pos, otherChunk.pos, 0.5f);
+            Vector2 midpoint = Vector2.Lerp(self.firstChunk.pos, otherChunk.pos, 0.5f);
 
             data.handPos = midpoint - Vector2.up * data.lax * 12;
 
