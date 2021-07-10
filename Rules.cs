@@ -1,5 +1,6 @@
 ﻿using BepInEx.Logging;
-using Gamerules;
+using Gamerules.Rules;
+using Gamerules.Rules.Builders;
 
 namespace GameruleSet
 {
@@ -32,33 +33,46 @@ namespace GameruleSet
 
             Logger = logger;
 
-            Injury = new BoolRule(false)
-            {
-                ID = "injury",
-                Description = "While healthy, if you suffer a critical injury, you survive and become injured until you sleep. Headshots are still lethal unless you're holding a vulture mask. King vulture masks are sturdy. Mushrooms let you push through the pain of injury."
-            };
+            Injury = new BoolRuleBuilder()
+                .Description("While healthy, if you suffer a critical injury, you survive and become injured until you sleep. Headshots are still lethal unless you're holding a vulture mask. King vulture masks are sturdy. Mushrooms let you push through the pain of injury.")
+                .Register("std/injury");
 
-            Imbalanced = new BoolRule(false) { ID = "karmically_imbalanced", Description = "Karma flowers don't spawn." };
+            Imbalanced = new BoolRuleBuilder().Description("Karma flowers don't spawn.")
+                .Register("std/karmically_imbalanced");
 
-            Corpulent = new FloatRule(1, 0, 4) { ID = "corpulent", Description = "Multiplier for the amount of food needed to hibernate." };
+            Corpulent = new FloatRuleBuilder().Default(1).Min(0).Max(4).Description("Multiplier for the amount of food needed to hibernate.")
+                .Register("std/corpulent");
 
-            Insatiable = new FloatRule(1, 0, 4) { ID = "insatiable", Description = "Multiplier for the amount of food pips that items give." };
+            Insatiable = new FloatRuleBuilder().Default(1).Min(0).Max(4).Description("Multiplier for the amount of food pips that items give.")
+                .Register("std/insatiable");
 
-            Dislodge = new BoolRule(false) { ID = "dislodge_spears", Description = "You can dislodge stuck spears if you are standing nearby or hanging from them." };
+            Dislodge = new BoolRuleBuilder().Description("You can dislodge stuck spears if you are standing nearby or hanging from them.")
+                .Register("std/dislodge_spears");
+            
+            StableSpears = new BoolRuleBuilder().Description("When you stick a spear in a wall, it won't fall off on its own.")
+                .Register("std/stable_spears");
 
-            StableSpears = new BoolRule(false) { ID = "stable_spears", Description = "When you stick a spear in a wall, it won't fall off on its own." };
+            Persistence = new EnumRuleBuilder<PersistenceEnum>()
+                .Description("Determines when objects (excluding ephemeral items) should live through a cycle. 'All' means they don't despawn. 'Wet' means they don't despawn unless they're under open sky. 'Dry' means they don't despawn unless the room rains or floods. 'None' means they follow vanilla behavior.")
+                .Register("std/persistence");
 
-            Persistence = new EnumRule<PersistenceEnum>(PersistenceEnum.None) { ID = "persistence", Description = "Determines when objects (excluding ephemeral items) should live through a cycle. 'All' means they don't despawn. 'Wet' means they don't despawn unless they're under open sky. 'Dry' means they don't despawn unless the room rains or floods. 'None' means they follow vanilla behavior." };
+            SaveShelterPositions = new BoolRuleBuilder().Description("Creatures' positions aren't reset when you wake up in a shelter.")
+                .Register("std/save_shelter_positions");
 
-            SaveShelterPositions = new BoolRule(false) { ID = "save_shelter_positions", Description = "Creatures' positions aren't reset when you wake up in a shelter." };
+            CycleLength = new FloatRuleBuilder().Default(1).Min(0).Max(4).Description("Multiplier for cycle length.")
+                .Register("std/cycle_length");
 
-            CycleLength = new FloatRule(1) { ID = "cycle_length", Description = "Multiplier for cycle length." };
+            SleepAnywhere = new BoolRuleBuilder()
+                .Description("Lets you sleep anywhere by holding crouch on a solid, flat surface. May not work correctly if 'save_shelter_positions' is false.")
+                .Register("std/sleep_anywhere");
 
-            SleepAnywhere = new BoolRule(false) { ID = "sleep_anywhere", Description = "Lets you sleep anywhere by holding crouch on a solid, flat surface. May not work correctly if 'save_shelter_positions' is false." };
+            ShareGrasps = new BoolRuleBuilder()
+                .Description("Lets creatures grab different parts of the same object. For example, two players can hold different parts of the same dead centipede.")
+                .Register("std/share_grasps");
 
-            ShareGrasps = new BoolRule(false) { ID = "share_grasps", Description = "Lets creatures grab different parts of the same object. For example, two players can hold different parts of the same dead centipede." };
-
-            HandHolding = new BoolRule(false) { ID = "hand_holding", Description = "Lets you hold the hand of scavengers, iterators, and slugcats by just grabbing them." };
+            HandHolding = new BoolRuleBuilder()
+                .Description("Hold grab and map keys while approaching a scavenger, iterator, or slugcat to grab its hand.")
+                .Register("std/hand_holding");
 
             new Injury(this);
             new Imbalanced(this);
