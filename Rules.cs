@@ -8,10 +8,6 @@ namespace GameruleSet
     {
         internal static Rules? CurrentRules { get; private set; }
 
-        private RainWorld? rw;
-        public RainWorld RW => rw ??= UnityEngine.Object.FindObjectOfType<RainWorld>();
-        public RainWorldGame? RWGame => RW.processManager.currentMainLoop as RainWorldGame;
-
         public ManualLogSource Logger { get; }
 
         public BoolRule Injury { get; }
