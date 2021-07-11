@@ -360,9 +360,9 @@ namespace GameruleSet
             var grabber = self.grabber;
             var grabbed = self.grabbed;
             orig(self);
-            if (grabber is Player && grabbed is Creature other)
+            if (grabber is Player && grabbed is Creature other && other.grasps != null)
                 foreach (var otherGrasp in other.grasps)
-                    if (otherGrasp?.grabbed == grabber)
+                    if (otherGrasp?.grabbed != null && otherGrasp.grabbed == grabber)
                         otherGrasp.Release();
         }
 
