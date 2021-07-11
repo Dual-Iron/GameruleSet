@@ -1,4 +1,5 @@
 ﻿using StaticTables;
+using System;
 
 namespace GameruleSet
 {
@@ -71,17 +72,8 @@ namespace GameruleSet
                 return orig(self, checkRoom, eatAndDestroy);
             }
 
-            var sum = orig(self, checkRoom, false) - self.FoodInStomach;
-            var ret = (int)(sum * rules.Insatiable + self.FoodInStomach + self.playerState.quarterFoodPoints * 0.25f);
-
-            // If you're not eating, just return the result.
-            if (!eatAndDestroy)
-            {
-                return ret;
-            }
-
             // Eat karma flowers.
-            if (checkRoom.game.session is StoryGameSession s && !s.saveState.deathPersistentSaveData.reinforcedKarma)
+            if (eatAndDestroy && checkRoom.game.session is StoryGameSession s && !s.saveState.deathPersistentSaveData.reinforcedKarma)
             {
                 foreach (var entities in checkRoom.abstractRoom.entities)
                 {
@@ -97,37 +89,39 @@ namespace GameruleSet
                 }
             }
 
-            // If you'd starve anyway, don't eat anything.
-            if (ret < self.slugcatStats.foodToHibernate)
-            {
-                return ret;
-            }
-
             var count = self.FoodInStomach + self.playerState.quarterFoodPoints * 0.25f;
+
+            if (eatAndDestroy && self.FoodInRoom(checkRoom, false) < self.slugcatStats.foodToHibernate)
+            {
+                return (int)count;
+            }
 
             // Eat flies in hands first.
             for (int j = 0; j < self.grasps.Length; j++)
             {
-                if (self.grasps[j]?.grabbed is Fly fly)
+                if (self.grasps[j]?.grabbed is Fly fly && self.ObjectCountsAsFood(fly))
                 {
                     count += fly.FoodPoints * rules.Insatiable;
 
-                    var grabbed = self.grasps[j].grabbed;
-                    foreach (var stick in self.abstractCreature.stuckObjects)
+                    if (eatAndDestroy)
                     {
-                        if (stick.A == self.abstractCreature && stick.B == grabbed.abstractPhysicalObject)
+                        var grabbed = self.grasps[j].grabbed;
+                        foreach (var stick in self.abstractCreature.stuckObjects)
                         {
-                            stick.Deactivate();
+                            if (stick.A == self.abstractCreature && stick.B == grabbed.abstractPhysicalObject)
+                            {
+                                stick.Deactivate();
+                            }
                         }
+                        if (self.SessionRecord != null)
+                        {
+                            self.SessionRecord.AddEat(grabbed);
+                        }
+                        grabbed.Destroy();
+                        checkRoom.RemoveObject(grabbed);
+                        checkRoom.abstractRoom.RemoveEntity(grabbed.abstractPhysicalObject);
+                        self.ReleaseGrasp(j);
                     }
-                    if (self.SessionRecord != null)
-                    {
-                        self.SessionRecord.AddEat(grabbed);
-                    }
-                    grabbed.Destroy();
-                    checkRoom.RemoveObject(grabbed);
-                    checkRoom.abstractRoom.RemoveEntity(grabbed.abstractPhysicalObject);
-                    self.ReleaseGrasp(j);
 
                     if (count >= self.MaxFoodInStomach)
                     {
@@ -149,20 +143,23 @@ namespace GameruleSet
                 {
                     count += i.FoodPoints * rules.Insatiable;
 
-                    foreach (var stick in self.abstractCreature.stuckObjects)
+                    if (eatAndDestroy)
                     {
-                        if (stick.A == self.abstractCreature && stick.B == o.realizedObject.abstractPhysicalObject)
+                        foreach (var stick in self.abstractCreature.stuckObjects)
                         {
-                            stick.Deactivate();
+                            if (stick.A == self.abstractCreature && stick.B == o.realizedObject.abstractPhysicalObject)
+                            {
+                                stick.Deactivate();
+                            }
                         }
+                        if (self.SessionRecord != null)
+                        {
+                            self.SessionRecord.AddEat(o.realizedObject);
+                        }
+                        o.realizedObject.Destroy();
+                        checkRoom.RemoveObject(o.realizedObject);
+                        checkRoom.abstractRoom.RemoveEntity(o.realizedObject.abstractPhysicalObject);
                     }
-                    if (self.SessionRecord != null)
-                    {
-                        self.SessionRecord.AddEat(o.realizedObject);
-                    }
-                    o.realizedObject.Destroy();
-                    checkRoom.RemoveObject(o.realizedObject);
-                    checkRoom.abstractRoom.RemoveEntity(o.realizedObject.abstractPhysicalObject);
 
                     if (count >= self.slugcatStats.foodToHibernate)
                     {
