@@ -30,7 +30,7 @@ namespace GameruleSet
             Logger = logger;
 
             Injury = new BoolRuleBuilder()
-                .Description("While healthy, if you suffer a critical injury, you survive and become injured until you sleep. Headshots are still lethal unless you're holding a vulture mask. King vulture masks are sturdy. Mushrooms let you push through the pain of injury.")
+                .Description("While healthy, if you suffer a critical injury, you survive and become injured until you sleep. Mushrooms work as painkillers. Headshots are still lethal unless you're holding a vulture mask, and king vulture masks are extra sturdy.")
                 .Register("std/injury");
 
             Imbalanced = new BoolRuleBuilder().Description("Karma flowers don't spawn.")
