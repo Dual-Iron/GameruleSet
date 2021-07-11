@@ -202,7 +202,7 @@ namespace GameruleSet
             }
             else
             {
-                sleepData.sleepingFor -= canSleep ? 2 : 6;
+                sleepData.sleepingFor -= canSleep ? 2 : 10;
                 if (sleepData.sleepingFor < 0)
                     sleepData.sleepingFor = 0;
             }
