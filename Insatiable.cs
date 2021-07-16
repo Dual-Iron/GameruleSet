@@ -79,6 +79,7 @@ namespace GameruleSet
                 {
                     if (entities is AbstractPhysicalObject o && o.realizedObject != null && o.type == AbstractPhysicalObject.AbstractObjectType.KarmaFlower)
                     {
+                        Console.WriteLine("KARMA FLOWER MYSTERIOUS!! " + o);
                         s.saveState.deathPersistentSaveData.reinforcedKarma = true;
                         if (self.SessionRecord != null)
                         {

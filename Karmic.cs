@@ -28,23 +28,18 @@ namespace GameruleSet
                 return;
             }
 
-            var jmp = cursor.Next.Next.Next.Next;
+            cursor.Remove();
 
-            if (jmp == null)
+            cursor.EmitDelegate<Func<RainWorldGame, int>>(EffectiveCharacter);
+
+            int EffectiveCharacter(RainWorldGame self)
             {
-                rules.Logger.LogError("Missing jmp");
-                return;
-            }
-
-            cursor.Index--;
-
-            cursor.EmitDelegate<Func<Room, bool>>(PlaceKarmaFlower);
-            cursor.Emit(OpCodes.Brtrue, jmp);
-            cursor.Emit(OpCodes.Ldarg_0);
-
-            bool PlaceKarmaFlower(Room self)
-            {
-                return rules.Karmic.Value == KarmaRating.Attuned;
+                return rules.Karmic.Value switch
+                {
+                    KarmaRating.Attuned => 0,
+                    KarmaRating.Imbalanced => 2,
+                    _ => self.StoryCharacter
+                };
             }
         }
 
