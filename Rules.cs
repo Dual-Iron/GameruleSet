@@ -4,6 +4,13 @@ using Gamerules.Rules.Builders;
 
 namespace GameruleSet
 {
+    public enum KarmaRating
+    {
+        Default,
+        Imbalanced,
+        Attuned
+    }
+
     public sealed class Rules
     {
         internal static Rules? CurrentRules { get; private set; }
@@ -11,7 +18,7 @@ namespace GameruleSet
         public ManualLogSource Logger { get; }
 
         public BoolRule Injury { get; }
-        public BoolRule Imbalanced { get; }
+        public EnumRule<KarmaRating> Karmic { get; }
         public FloatRule Corpulent { get; }
         public FloatRule Insatiable { get; }
         public BoolRule Dislodge { get; }
@@ -33,8 +40,8 @@ namespace GameruleSet
                 .Description("While healthy, if you suffer a critical injury, you survive and become injured until you sleep. Mushrooms work as painkillers. Headshots are still lethal unless you're holding a vulture mask, and king vulture masks are extra sturdy.")
                 .Register("std/injury");
 
-            Imbalanced = new BoolRuleBuilder().Description("Karma flowers don't spawn.")
-                .Register("std/karmically_imbalanced");
+            Karmic = new EnumRuleBuilder<KarmaRating>().Description("'Default' follows vanilla behavior. 'Imbalanced' removes karma flowers. 'Attuned' makes karma flowers always spawn, even in Hunter mode.")
+                .Register("std/karmic");
 
             Corpulent = new FloatRuleBuilder().Default(1).Min(0).Max(4).Description("Multiplier for the amount of food needed to hibernate.")
                 .Register("std/corpulent");
@@ -71,7 +78,7 @@ namespace GameruleSet
                 .Register("std/hand_holding");
 
             new Injury(this);
-            new Imbalanced(this);
+            new Karmic(this);
             new Corpulent(this);
             new Insatiable(this);
             new Dislodge(this);
