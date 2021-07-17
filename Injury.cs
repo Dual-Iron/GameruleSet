@@ -6,23 +6,35 @@ using UnityEngine;
 
 namespace GameruleSet
 {
-    public class Injury
+    public partial class Injury
     {
         private const int maxPainTime = 60;
 
         struct InjuryData : IWeakData<PlayerState>
         {
-            public int injuryCooldown;
-            public bool injured;
+            public float injury;
             public float damageBlockedWithMask;
-            public float danger;
             public int painTime;
             public float lastAerobicLevel;
             public float woundDir;
             public bool shouldPain;
 
+            public bool InPain => painTime > 0;
+            public bool Injured => injury > 0;
+
             void IWeakData<PlayerState>.Construct(PlayerState key) { }
             void IWeakData<PlayerState>.Destruct() { }
+        }
+
+        struct SaveStateData : IWeakData<SaveState>
+        {
+            public float[] injuries;
+
+            void IWeakData<SaveState>.Construct(SaveState owner)
+            {
+                injuries = new float[0];
+            }
+            void IWeakData<SaveState>.Destruct() { }
         }
 
         private readonly Rules rules;
@@ -33,6 +45,8 @@ namespace GameruleSet
         {
             this.rules = rules;
 
+            new InjurySave(rules);
+            
             On.PlayerGraphics.Update += PlayerGraphics_Update;
             On.Player.Die += Player_Die;
             On.Player.TerrainImpact += Player_TerrainImpact;
@@ -83,14 +97,14 @@ namespace GameruleSet
                 orig(self);
 
                 var data = self.player.playerState.Data().Get<InjuryData>();
-                if (data.injured)
+                if (data.Injured)
                 {
-                    if (self.malnourished < 0.6f)
+                    if (self.malnourished < data.injury * 0.75f + 0.25f)
                         self.malnourished += 0.01f;
 
                     if (self.player.State.alive)
                     {
-                        if (data.painTime > 0)
+                        if (data.InPain)
                         {
                             if (self.markAlpha > 0)
                             {
@@ -104,7 +118,7 @@ namespace GameruleSet
 
                         if (!self.player.lungsExhausted && !self.player.exhausted)
                         {
-                            self.breath += 1 / 75f;
+                            self.breath += 1 / (70f - UnityEngine.Random.value * data.injury * 25f);
                             self.player.swimCycle += 0.05f * self.player.aerobicLevel;
 
                             if (self.player.stun <= 0)
@@ -154,9 +168,11 @@ namespace GameruleSet
 
         private void Player_Stun(On.Player.orig_Stun orig, Player self, int st)
         {
-            if (st > 10 && st > self.stun && rules.Injury && self.playerState.Data().Get<InjuryData>().injured)
+            if (rules.Injury)
             {
-                self.aerobicLevel = Mathf.Clamp01(self.aerobicLevel + st / 100f);
+                var data = self.playerState.Data().Get<InjuryData>();
+
+                st = (int)(st * (1 + data.injury));
             }
             orig(self, st);
         }
@@ -173,22 +189,15 @@ namespace GameruleSet
 
         private bool Creature_Grab(On.Creature.orig_Grab orig, Creature self, PhysicalObject obj, int graspUsed, int chunkGrabbed, Creature.Grasp.Shareability shareability, float dominance, bool overrideEquallyDominant, bool pacifying)
         {
-            if (rules.Injury && obj is Player player)
+            if (rules.Injury && obj is Player player && chunkGrabbed == 0)
             {
-                if (player.playerState.Data().Get<InjuryData>().injuryCooldown > 0)
+                var mask = GetGraspedMask(player);
+                if (mask != null)
                 {
-                    return false;
-                }
-                if (chunkGrabbed == 0)
-                {
-                    var mask = GetGraspedMask(player);
-                    if (mask != null)
-                    {
-                        mask.room.PlaySound(SoundID.Spear_Fragment_Bounce, mask.firstChunk.pos, 0.7f, 1.35f);
-                        VulturePopEffect(obj.room, null, obj.bodyChunks[chunkGrabbed].pos, 0.1f, pacifying ? 45f : 0f);
-                        mask.AllGraspsLetGoOfThisObject(true);
-                        obj = mask;
-                    }
+                    mask.room.PlaySound(SoundID.Spear_Fragment_Bounce, mask.firstChunk.pos, 0.7f, 1.35f);
+                    VulturePopEffect(obj.room, null, obj.bodyChunks[chunkGrabbed].pos, 0.1f, pacifying ? 45f : 0f);
+                    mask.AllGraspsLetGoOfThisObject(true);
+                    obj = mask;
                 }
             }
             return orig(self, obj, graspUsed, chunkGrabbed, shareability, dominance, overrideEquallyDominant, pacifying);
@@ -199,7 +208,7 @@ namespace GameruleSet
             orig(self, f);
 
             ref var data = ref self.playerState.Data().Get<InjuryData>();
-            if (rules.Injury && data.injured && self.aerobicLevel >= 1)
+            if (rules.Injury && data.Injured && self.aerobicLevel >= 1)
             {
                 data.shouldPain = true;
             }
@@ -215,7 +224,7 @@ namespace GameruleSet
 
             ref var data = ref self.playerState.Data().Get<InjuryData>();
 
-            if (data.injured && self.State.alive)
+            if (data.Injured && self.State.alive)
             {
                 InjuredUpdate(self, ref data);
             }
@@ -232,36 +241,13 @@ namespace GameruleSet
                 self.Stun((int)(data.damageBlockedWithMask * 15));
                 data.damageBlockedWithMask = 0;
             }
-
-            var mask = GetGraspedMask(self);
-            if (mask != null && self.graphicsModule is PlayerGraphics graphics && graphics.objectLooker.currentMostInteresting is Creature creature && !creature.dead)
-            {
-                CreatureTemplate.Relationship relationship = self.abstractCreature.creatureTemplate.CreatureRelationship(creature);
-                if (relationship.type == CreatureTemplate.Relationship.Type.Afraid || relationship.type == CreatureTemplate.Relationship.Type.Attacks)
-                {
-                    data.danger += creature.abstractCreature.abstractAI.RealAI.CurrentPlayerAggression(self.abstractCreature) / 20f;
-                    mask.donned = Mathf.Clamp(data.danger, mask.donned, 1);
-                }
-            }
-            else data.danger = 0;
         }
 
         private static void InjuredUpdate(Player self, ref InjuryData data)
         {
-            if (data.injuryCooldown > 0)
-            {
-                data.injuryCooldown--;
-                self.aerobicLevel = 0;
-                data.lastAerobicLevel = 0;
-            }
-            else
-            {
-                data.injuryCooldown = 0;
-
-                // Aerobic level decreases 20% slower
-                if (self.aerobicLevel < data.lastAerobicLevel)
-                    self.aerobicLevel -= (self.aerobicLevel - data.lastAerobicLevel) * 0.2f;
-            }
+            // Aerobic level decreases 20% slower
+            if (self.aerobicLevel < data.lastAerobicLevel)
+                self.aerobicLevel -= (self.aerobicLevel - data.lastAerobicLevel) * (data.injury / 2);
 
             // If exhausted, experience pain
             if (self.aerobicLevel >= 1 && data.painTime == 0 || data.shouldPain)
@@ -273,7 +259,7 @@ namespace GameruleSet
             bool troubleStanding = false;
 
             // Agony
-            if (data.painTime > 0)
+            if (data.InPain)
             {
                 troubleStanding = true;
 
@@ -310,7 +296,7 @@ namespace GameruleSet
                 troubleStanding = true;
 
             if (troubleStanding && self.stun == 0 && self.animation != Player.AnimationIndex.HangFromBeam &&
-                self.standing && UnityEngine.Random.value < 0.03f)
+                self.standing && UnityEngine.Random.value < 0.04f)
             {
                 self.Stun(self.bodyMode == Player.BodyModeIndex.Stand ? 15 : 5);
             }
@@ -318,8 +304,15 @@ namespace GameruleSet
 
         private static void Hurt(Player self, ref InjuryData data)
         {
-            if (data.injuryCooldown > 0 || self.Adrenaline > 0)
+            if (self.Adrenaline > 0)
             {
+                return;
+            }
+
+            if (data.InPain)
+            {
+                self.Stun(30);
+                data.painTime = maxPainTime;
                 return;
             }
 
@@ -354,52 +347,83 @@ namespace GameruleSet
         {
             if (rules.Injury && self is Player player && player.State.alive)
             {
-                ref var data = ref player.playerState.Data().Get<InjuryData>();
-                if (hitChunk.index == 0 && (type == Creature.DamageType.Stab || type == Creature.DamageType.Blunt))
-                {
-                    var mask = GetGraspedMask(player);
-                    if (mask != null)
-                    {
-                        VulturePopEffect(player.room, source?.pos, hitChunk.pos, damage, stunBonus);
-                        if (!mask.King)
-                            data.damageBlockedWithMask = damage + stunBonus / 45f;
-                        else
-                            data.damageBlockedWithMask = stunBonus / 90f;
-                        mask.donned = 1f;
-                        stunBonus = 0;
-                        damage = 0;
-                    }
-                }
-                else if (damage >= self.Template.instantDeathDamageLimit)
-                {
-                    data.lastAerobicLevel = 0;
-                    player.aerobicLevel = 0;
-
-                    // Mitigate instant death from chained damage
-                    if (data.injuryCooldown > 0)
-                    {
-                        stunBonus += damage * 30 * 0.5f;
-                        damage *= 0.5f;
-                    }
-                    else if (!data.injured && !player.Malnourished)
-                    {
-                        data.woundDir = (directionAndMomentum?.GetAngle() ?? (UnityEngine.Random.value * 360)) - player.bodyChunks[1].Rotation.GetAngle();
-                        data.injured = true;
-                        data.injuryCooldown = 10;
-
-                        if (type == Creature.DamageType.Bite)
-                            stunBonus = 0;
-                        else
-                            stunBonus += damage * 30 * 0.5f;
-
-                        damage *= 0.5f;
-                    }
-
-                    if (player.Adrenaline > 0)
-                        stunBonus /= 4;
-                }
+                Injure(self, source, directionAndMomentum, hitChunk, type, ref damage, ref stunBonus, player);
             }
             orig(self, source, directionAndMomentum, hitChunk, hitAppendage, type, damage, stunBonus);
+        }
+
+        private void Injure(Creature self, BodyChunk source, Vector2? directionAndMomentum, BodyChunk hitChunk, Creature.DamageType type, ref float damage, ref float stunBonus, Player player)
+        {
+            float actualDamage(float damage)
+            {
+                return damage / self.Template.baseDamageResistance / (self.Template.damageRestistances[(int)type, 0] > 0 ? self.Template.damageRestistances[(int)type, 0] : 1);
+            }
+
+            ref var data = ref player.playerState.Data().Get<InjuryData>();
+
+            var wouldBeLethal = actualDamage(damage) >= self.Template.instantDeathDamageLimit;
+
+            if (wouldBeLethal)
+            {
+                if (source?.owner is Lizard l)
+                    damage = l.lizardParams.biteDamage * (0.8f + 0.4f * UnityEngine.Random.value);
+                else if (type == Creature.DamageType.Blunt)
+                    damage *= 0.3333f;
+                else if (type == Creature.DamageType.Explosion)
+                    damage *= 0.5f;
+            }
+
+            if (hitChunk.index == 0 && (type == Creature.DamageType.Stab || type == Creature.DamageType.Blunt))
+            {
+                if (source != null && GetGraspedMask(player) is VultureMask mask)
+                {
+                    VulturePopEffect(player.room, source.pos, hitChunk.pos, damage, stunBonus);
+
+                    if (!mask.King)
+                        data.damageBlockedWithMask = damage + stunBonus / 45f;
+                    else
+                        data.damageBlockedWithMask = stunBonus / 90f;
+
+                    mask.donned = 1f;
+                    stunBonus = 0;
+                    damage = 0f;
+
+                    return;
+                }
+            }
+            else
+            {
+                damage *= 0.5f;
+            }
+
+            if (wouldBeLethal)
+            {
+                data.lastAerobicLevel = 0;
+                player.aerobicLevel = 0;
+
+                // Mitigate instant death from chained damage
+                data.woundDir = (directionAndMomentum?.GetAngle() ?? (UnityEngine.Random.value * 360)) - player.bodyChunks[1].Rotation.GetAngle();
+
+                if (type == Creature.DamageType.Bite)
+                {
+                    stunBonus = 0;
+                }
+            }
+
+            if (wouldBeLethal || data.Injured)
+            {
+                data.injury += actualDamage(damage);
+
+                if (data.injury >= 1)
+                {
+                    data.injury = 1;
+
+                    if (wouldBeLethal)
+                    {
+                        damage = self.Template.instantDeathDamageLimit;
+                    }
+                }
+            }
         }
 
         private void VulturePopEffect(Room room, Vector2? sourcePos, Vector2 hitPos, float damage, float stunBonus)

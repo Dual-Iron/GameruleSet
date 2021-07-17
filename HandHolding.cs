@@ -175,8 +175,14 @@ namespace GameruleSet
             if (!orig(self, obj))
                 return false;
 
-            if (WannaHoldHands(self) && !CanHoldHand(obj))
+            if (WannaHoldHands(self))
+            {
+                return CanHoldHand(obj);
+            }
+            else if (CanHoldHand(obj))
+            {
                 return false;
+            }
 
             // Don't grab objects that are being held by the person you're holding
             if (!ignoreGrabGuard)

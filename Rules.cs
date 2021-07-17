@@ -4,13 +4,6 @@ using Gamerules.Rules.Builders;
 
 namespace GameruleSet
 {
-    public enum KarmaRating
-    {
-        Default,
-        Imbalanced,
-        Attuned
-    }
-
     public sealed class Rules
     {
         internal static Rules? CurrentRules { get; private set; }
@@ -37,7 +30,7 @@ namespace GameruleSet
             Logger = logger;
 
             Injury = new BoolRuleBuilder()
-                .Description("While healthy, if you suffer a critical injury, you survive and become injured until you sleep. Mushrooms work as painkillers. Headshots are still lethal unless you're holding a vulture mask, and king vulture masks are extra sturdy.")
+                .Description("You can survive critical damage and heal over the course of a few cycles. Mushrooms work as painkillers. Vulture masks protect against headshots. King vulture masks are sturdy.")
                 .Register("std/injury");
 
             Karmic = new EnumRuleBuilder<KarmaRating>().Description("'Default' follows vanilla behavior. 'Imbalanced' removes karma flowers. 'Attuned' makes karma flowers always spawn, even in Hunter mode.")
@@ -56,7 +49,7 @@ namespace GameruleSet
                 .Register("std/stable_spears");
 
             Persistence = new EnumRuleBuilder<PersistenceEnum>()
-                .Description("Determines when objects (excluding ephemeral items) should live through a cycle. 'All' means they don't despawn. 'Wet' means they don't despawn unless they're under open sky. 'Dry' means they don't despawn unless the room rains or floods. 'None' means they follow vanilla behavior.")
+                .Description("Determines when objects (excluding ephemeral items) should live through a cycle. 'All' means they never despawn. 'Wet' means they despawn if they're under open sky. 'Dry' means they despawn if the room rains or floods. 'None' means they despawn if not in a shelter (vanilla behavior).")
                 .Register("std/persistence");
 
             SaveShelterPositions = new BoolRuleBuilder().Description("Creatures' positions aren't reset when you wake up in a shelter.")
@@ -66,11 +59,11 @@ namespace GameruleSet
                 .Register("std/cycle_length");
 
             SleepAnywhere = new BoolRuleBuilder()
-                .Description("Lets you sleep anywhere by holding crouch on a solid, flat surface. May not work correctly if 'save_shelter_positions' is false.")
+                .Description("Lets you sleep anywhere by holding crouch on a solid, flat surface. Won't work correctly if 'save_shelter_positions' is false.")
                 .Register("std/sleep_anywhere");
 
             ShareGrasps = new BoolRuleBuilder()
-                .Description("Lets creatures grab different parts of the same object. For example, two players can hold different parts of the same dead centipede.")
+                .Description("Lets players grab different parts of the same object. For example, two players can hold different parts of the same dead centipede.")
                 .Register("std/share_grasps");
 
             HandHolding = new BoolRuleBuilder()

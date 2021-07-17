@@ -22,7 +22,7 @@
 
         private bool Grasp_ShareabilityConflict(On.Creature.Grasp.orig_ShareabilityConflict orig, Creature.Grasp self, Creature.Grasp.Shareability other)
         {
-            return (!rules.ShareGrasps || self.chunkGrabbed == chunkGrabbed) && orig(self, other);
+            return (self.grabber is not Player || !rules.ShareGrasps || self.chunkGrabbed == chunkGrabbed) && orig(self, other);
         }
     }
 }

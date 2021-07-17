@@ -1,7 +1,4 @@
-﻿// TODO port this to another mod
-// TODO port "Sleep Anywhere" to another mod
-
-using Mono.Cecil.Cil;
+﻿using Mono.Cecil.Cil;
 using MonoMod.Cil;
 using RWCustom;
 using StaticTables;
@@ -123,9 +120,9 @@ namespace GameruleSet
 
                     denData.pos = new IntVector2[players.Length - 1];
 
-                    for (int i = 0; i < players.Length; i++)
+                    for (int i = 0; i < players.Length - 1; i++)
                     {
-                        if (players[i] == null)
+                        if (string.IsNullOrEmpty(players[i]))
                             continue;
 
                         var values = players[i].Split(',');
