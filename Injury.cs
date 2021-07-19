@@ -357,9 +357,7 @@ namespace GameruleSet
             {
                 if (source?.owner is Lizard l)
                     damage = l.lizardParams.biteDamage * (0.8f + 0.4f * UnityEngine.Random.value);
-                else if (type == Creature.DamageType.Blunt)
-                    damage *= 0.3333f;
-                else if (type == Creature.DamageType.Explosion)
+                else if (type == Creature.DamageType.Explosion || type == Creature.DamageType.Blunt)
                     damage *= 0.5f;
             }
 
