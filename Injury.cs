@@ -63,24 +63,14 @@ namespace GameruleSet
 
         private float GetterInWorldSoundsVolumeGoal(Func<VirtualMicrophone, float> orig, VirtualMicrophone self)
         {
-            if (rules.Injury)
+            if (rules.Injury && self.room.game.IsStorySession)
             {
-                var average = 0f;
-                var count = 0;
-
-                foreach (var item in self.room.abstractRoom.entities)
+                foreach (var plr in self.room.game.Players)
                 {
-                    if (item is AbstractCreature c && c.realizedCreature is Player p && p.State.alive)
+                    if (plr?.realizedObject is Player p && p.State.alive)
                     {
-                        average += p.playerState.Data().Get<InjuryData>().painTime;
-                        count++;
+                        return orig(self) * Mathf.Lerp(1f, 0.5f, p.playerState.Data().Get<InjuryData>().painTime / (float)maxPainTime);
                     }
-                }
-
-                if (average > 0)
-                {
-                    average /= count;
-                    return orig(self) * Mathf.Lerp(1f, 0.4f, average / maxPainTime);
                 }
             }
             return orig(self);
