@@ -275,7 +275,7 @@ namespace GameruleSet
             if (self.Adrenaline > 0)
                 return;
 
-            self.slowMovementStun = Math.Max(self.slowMovementStun, (int)(6f * self.aerobicLevel));
+            self.slowMovementStun = Math.Max(self.slowMovementStun, (int)(data.injury * 20f * (self.aerobicLevel - 0.5f)));
 
             // Forewarn pain
             if (self.aerobicLevel >= 0.68f)
