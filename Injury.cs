@@ -246,12 +246,12 @@ namespace GameruleSet
                 Hurt(self, ref data);
             }
 
-            bool troubleStanding = false;
+            var troubleStanding = 0f;
 
             // Agony
             if (data.InPain)
             {
-                troubleStanding = true;
+                troubleStanding = 0.04f;
 
                 self.slowMovementStun = Math.Max(self.slowMovementStun, (int)(10f * self.aerobicLevel));
 
@@ -278,17 +278,17 @@ namespace GameruleSet
             self.slowMovementStun = Math.Max(self.slowMovementStun, (int)(data.injury * 20f * (self.aerobicLevel - 0.5f)));
 
             // Forewarn pain
-            if (self.aerobicLevel >= 0.68f)
+            if (self.aerobicLevel >= 0.75f)
                 self.Blink(2);
 
             // Twinge of pain
-            if (self.aerobicLevel >= 0.85f)
-                troubleStanding = true;
+            if (self.aerobicLevel >= 0.88f && troubleStanding == 0f)
+                troubleStanding = 0.02f;
 
-            if (troubleStanding && self.stun == 0 && self.animation != Player.AnimationIndex.HangFromBeam &&
-                self.standing && UnityEngine.Random.value < 0.04f)
+            if (self.stun == 0 && self.animation != Player.AnimationIndex.HangFromBeam &&
+                self.standing && UnityEngine.Random.value < troubleStanding)
             {
-                self.Stun(self.bodyMode == Player.BodyModeIndex.Stand ? 15 : 5);
+                self.Stun(self.bodyMode == Player.BodyModeIndex.Stand ? 9 : 3);
             }
         }
 
@@ -363,7 +363,7 @@ namespace GameruleSet
 
             if (hitChunk.index == 0 && (type == Creature.DamageType.Stab || type == Creature.DamageType.Blunt))
             {
-                if (source != null && GetGraspedMask(player) is VultureMask mask)
+                if (source != null && GetGraspedMask(player) is VultureMask mask && damage < (mask.King ? 6 : 3))
                 {
                     VulturePopEffect(player.room, source.pos, hitChunk.pos, damage, stunBonus);
 
@@ -394,7 +394,7 @@ namespace GameruleSet
 
                 if (type == Creature.DamageType.Bite)
                 {
-                    stunBonus = 0;
+                    stunBonus /= 5;
                 }
             }
 
