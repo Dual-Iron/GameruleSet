@@ -102,7 +102,7 @@ namespace GameruleSet
             orig(self);
 
             ref var data = ref self.player.Data().Get<DislodgeAnim>();
-            if (IsPullingSpear(self.player, data, out var spear))
+            if (rules.Dislodge && data.spear.TryGetTarget(out var spear))
             {
                 var pos = self.player.room.MiddleOfTile(spear!.abstractSpear.pos);
 
@@ -134,7 +134,7 @@ namespace GameruleSet
         private void Player_UpdateAnimation(On.Player.orig_UpdateAnimation orig, Player self)
         {
             ref var data = ref self.Data().Get<DislodgeAnim>();;
-            if (IsPullingSpear(self, data, out var spear))
+            if (rules.Dislodge && data.spear.TryGetTarget(out var spear))
             {
                 self.animation = EnumExt_GameruleSet.PullingSpear;
 
@@ -222,12 +222,6 @@ namespace GameruleSet
             if (data.spear.TryGetTarget(out _))
                 data.spear = new();
             data.time = 0;
-        }
-
-        private bool IsPullingSpear(Player self, DislodgeAnim data, out Spear? spear)
-        {
-            spear = null;
-            return rules.Dislodge && data.spear.TryGetTarget(out spear) && (self.bodyMode == CorridorClimb || self.bodyMode == ClimbIntoShortCut || self.animation == EnumExt_GameruleSet.PullingSpear);
         }
 
         private void FirstYank(Player self, Spear spear, Vector2 target)
