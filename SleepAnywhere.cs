@@ -193,7 +193,7 @@ namespace GameruleSet
 
             ref var sleepData = ref self.Data().Get<SleepData>();
 
-            bool canSleep = self.Consious && !self.Malnourished && self.dangerGrasp == null;
+            bool canSleep = self.Consious && self.airInLungs >= 0.95f && !self.Malnourished && self.dangerGrasp == null;
 
             if (canSleep && self.bodyMode == Player.BodyModeIndex.Crawl && self.animation == Player.AnimationIndex.None && self.input[0].x == 0 && self.input[0].y < 0)
             {
@@ -244,7 +244,7 @@ namespace GameruleSet
 
             var world = self.abstractCreature.world;
             int global = GetGlobalSleepingFor(world.game);
-            if (global >= maxSleeping && world.rainCycle.TimeUntilRain < -1200)
+            if (global >= maxSleeping && world.rainCycle.TimeUntilRain < -2400)
             {
                 int foodInStomach = world.game.Players.Max(a => a?.realizedCreature is Player p ? p.playerState.foodInStomach : 0);
                 int foodToHibernate = world.game.Players.Max(a => a?.realizedCreature is Player p ? p.slugcatStats.foodToHibernate : 0);
