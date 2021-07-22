@@ -247,13 +247,15 @@ namespace GameruleSet
 
             var world = self.abstractCreature.world;
             int global = GetGlobalSleepingFor(world.game);
-            if (global >= maxSleeping && self.playerState.playerNumber == 0 && !self.Malnourished && 
-                world.rainCycle.TimeUntilRain < -2400 && self.room?.roomRain?.dangerType == RoomRain.DangerType.None && self.abstractCreature.Room?.shelter == false)
+            if (global >= maxSleeping && world.game.Players[0] == self.abstractCreature && !self.Malnourished &&
+                world.rainCycle.TimeUntilRain < -1200 && world.game.globalRain.Intensity >= 1 && self.abstractCreature.Room?.shelter == false)
             {
-                // If sleeping outside a shelter, nourished, the rain has been there for 60 seconds, and there are no dangers in the room, sleep.
-                int foodInStomach = world.game.Players.Max(a => a?.realizedCreature is Player p ? p.playerState.foodInStomach : 0);
-                int foodToHibernate = world.game.Players.Max(a => a?.realizedCreature is Player p ? p.slugcatStats.foodToHibernate : 0);
-                world.game.Win(foodInStomach < foodToHibernate);
+                var roomRain = self.room?.roomRain;
+                if (roomRain == null || roomRain.dangerType == RoomRain.DangerType.None || roomRain.dangerType == RoomRain.DangerType.Rain)
+                {
+                    // If sleeping outside a shelter while nourished and safe, sleep.
+                    world.game.Win(self.playerState.foodInStomach < self.slugcatStats.foodToHibernate);
+                }
             }
         }
     }
