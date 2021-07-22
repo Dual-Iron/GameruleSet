@@ -66,6 +66,7 @@ namespace GameruleSet
             On.SocialEventRecognizer.WeaponAttack += SocialEventRecognizer_WeaponAttack;
             On.SocialEventRecognizer.CreaturePutItemOnGround += SocialEventRecognizer_CreaturePutItemOnGround;
             On.PlayerGraphics.PlayerObjectLooker.HowInterestingIsThisObject += PlayerObjectLooker_HowInterestingIsThisObject;
+            On.Player.ReleaseObject += Player_ReleaseObject;
             On.Player.GrabUpdate += Player_GrabUpdate;
             On.Player.CanIPickThisUp += Player_CanIPickThisUp;
             On.Player.IsObjectThrowable += Player_IsObjectThrowable;
@@ -76,6 +77,16 @@ namespace GameruleSet
             On.Player.HeavyCarry += Player_HeavyCarry;
             On.Player.Grabability += Player_Grabability;
             this.rules = rules;
+        }
+
+        private void Player_ReleaseObject(On.Player.orig_ReleaseObject orig, Player self, int grasp, bool eu)
+        {
+            int otherGrasp = 1 - grasp;
+            if (CanHoldHand(self.grasps[grasp]?.grabbed) && self.grasps[otherGrasp]?.grabbed != null && !CanHoldHand(self.grasps[otherGrasp]?.grabbed))
+            {
+                grasp = otherGrasp;
+            }
+            orig(self, grasp, eu);
         }
 
         private void Scavenger_Update1(On.Scavenger.orig_Update orig, Scavenger self, bool eu)
@@ -91,7 +102,9 @@ namespace GameruleSet
         private void Creature_Die(On.Creature.orig_Die orig, Creature self)
         {
             if (self is Scavenger s)
+            {
                 DropHands(s);
+            }
 
             orig(self);
         }
