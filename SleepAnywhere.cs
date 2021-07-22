@@ -25,6 +25,24 @@ namespace GameruleSet
             void IWeakData<Player>.Destruct() { }
         }
 
+        private static int GetGlobalSleepingFor(RainWorldGame game)
+        {
+            int sleepingAmount = int.MaxValue;
+
+            foreach (var abstractPlayer in game.Players)
+            {
+                // Get the minimum sleepingFor value. If not all players are sleeping, don't sleep.
+                if (abstractPlayer?.realizedCreature is Player player && player.Consious)
+                {
+                    var sleepData = player.Data().Get<SleepData>();
+                    if (sleepingAmount > sleepData.sleepingFor)
+                        sleepingAmount = sleepData.sleepingFor;
+                }
+            }
+
+            return sleepingAmount != int.MaxValue ? sleepingAmount : 0;
+        }
+
         private readonly Rules rules;
         private bool caughtMMF;
 
@@ -142,24 +160,6 @@ namespace GameruleSet
             }
         }
 
-        private static int GetGlobalSleepingFor(RainWorldGame game)
-        {
-            int sleepingAmount = int.MaxValue;
-
-            foreach (var abstractPlayer in game.Players)
-            {
-                // Get the minimum sleepingFor value. If not all players are sleeping, don't sleep.
-                if (abstractPlayer?.realizedCreature is Player player && player.Consious)
-                {
-                    var sleepData = player.Data().Get<SleepData>();
-                    if (sleepingAmount > sleepData.sleepingFor)
-                        sleepingAmount = sleepData.sleepingFor;
-                }
-            }
-
-            return sleepingAmount != int.MaxValue ? sleepingAmount : 0;
-        }
-
         private void HUD_Update(On.HUD.HUD.orig_Update orig, HUD.HUD self)
         {
             orig(self);
@@ -186,14 +186,16 @@ namespace GameruleSet
         {
             orig(self, eu);
 
-            if (!rules.SleepAnywhere || (self.abstractCreature.Room?.shelter ?? true) || !self.abstractCreature.world.game.IsStorySession)
+            if (!rules.SleepAnywhere || !self.abstractCreature.world.game.IsStorySession)
             {
                 return;
             }
 
             ref var sleepData = ref self.Data().Get<SleepData>();
 
-            bool canSleep = self.Consious && self.airInLungs >= 0.95f && !self.Malnourished && self.dangerGrasp == null;
+            bool canSleep = self.Consious && self.airInLungs >= 0.95f && self.grabbedBy.Count == 0 && self.abstractCreature.Room?.shelter == false &&
+                (self.bodyChunks[0].pos - self.bodyChunks[0].lastPos).sqrMagnitude < 1 &&
+                (self.bodyChunks[1].pos - self.bodyChunks[1].lastPos).sqrMagnitude < 1;
 
             if (canSleep && self.bodyMode == Player.BodyModeIndex.Crawl && self.animation == Player.AnimationIndex.None && self.input[0].x == 0 && self.input[0].y < 0)
             {
@@ -220,6 +222,7 @@ namespace GameruleSet
 
             if (sleepData.sleepingFor >= startSleeping)
             {
+                self.aerobicLevel *= 0.5f;
                 if (sleepData.groggy < maxGroggy)
                     sleepData.groggy++;
             }
@@ -244,8 +247,10 @@ namespace GameruleSet
 
             var world = self.abstractCreature.world;
             int global = GetGlobalSleepingFor(world.game);
-            if (global >= maxSleeping && world.rainCycle.TimeUntilRain < -2400)
+            if (global >= maxSleeping && self.playerState.playerNumber == 0 && !self.Malnourished && 
+                world.rainCycle.TimeUntilRain < -2400 && self.room?.roomRain?.dangerType == RoomRain.DangerType.None && self.abstractCreature.Room?.shelter == false)
             {
+                // If sleeping outside a shelter, nourished, the rain has been there for 60 seconds, and there are no dangers in the room, sleep.
                 int foodInStomach = world.game.Players.Max(a => a?.realizedCreature is Player p ? p.playerState.foodInStomach : 0);
                 int foodToHibernate = world.game.Players.Max(a => a?.realizedCreature is Player p ? p.slugcatStats.foodToHibernate : 0);
                 world.game.Win(foodInStomach < foodToHibernate);
