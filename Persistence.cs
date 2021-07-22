@@ -61,7 +61,10 @@ namespace GameruleSet
                 ref var data = ref self.abstractRoom.world.game.Data().Get<GameData>();
                 for (int i = startIndex; i < self.abstractRoom.entities.Count; i++)
                 {
-                    if (self.abstractRoom.entities[i] is AbstractPhysicalObject o && (o is not AbstractConsumable c || c.placedObjectIndex < 0))
+                    if (self.abstractRoom.entities[i] is AbstractPhysicalObject o && 
+                        (o is not AbstractConsumable c || c.placedObjectIndex < 0) &&
+                        (o is not DataPearl.AbstractDataPearl d || d.dataPearlType != DataPearl.AbstractDataPearl.DataPearlType.Red_stomach) &&
+                        o.type != AbstractPhysicalObject.AbstractObjectType.NSHSwarmer)
                     {
                         data.dontSave.Add(o.ID);
                     }
@@ -252,14 +255,6 @@ namespace GameruleSet
                     if (abstractRoom.entities[j] is not AbstractPhysicalObject o)
                         continue;
 
-                    foreach (var stick in o.stuckObjects)
-                    {
-                        if (stick.A == o)
-                        {
-                            self.savedSticks.Add(stick.SaveToString(abstractRoom.index));
-                        }
-                    }
-
                     if (o.pos.x >= 0 && o.pos.x <= abstractRoom.size.x &&
                         o.pos.y >= 0 && o.pos.y <= abstractRoom.size.y &&
                         o.type != AbstractPhysicalObject.AbstractObjectType.Creature &&
@@ -270,6 +265,14 @@ namespace GameruleSet
                         !gameData.dontSave.Contains(o.ID) &&
                         PersistenceApplies(ref room, ref rain, self.world, o.pos))
                     {
+                        foreach (var stick in o.stuckObjects)
+                        {
+                            if (stick.A == o)
+                            {
+                                self.savedSticks.Add(stick.SaveToString(abstractRoom.index));
+                            }
+                        }
+
                         self.savedObjects.Add(o.ToString());
                     }
                 }
