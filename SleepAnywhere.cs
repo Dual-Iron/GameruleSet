@@ -20,6 +20,7 @@ namespace GameruleSet
         {
             public int sleepingFor;
             public int groggy;
+            public bool wasSleeping;
 
             void IWeakData<Player>.Construct(Player key) { }
             void IWeakData<Player>.Destruct() { }
@@ -211,12 +212,21 @@ namespace GameruleSet
 
             if (!canSleep)
             {
-                self.sleepCurlUp = 0;
-                self.forceSleepCounter = 0;
+                if (sleepData.wasSleeping)
+                {
+                    sleepData.wasSleeping = false;
+                    self.sleepCurlUp = 0;
+                    self.forceSleepCounter = 0;
+                }
                 return;
             }
 
             self.forceSleepCounter = Math.Max(0, sleepData.sleepingFor - startCurl);
+
+            if (self.forceSleepCounter > 0)
+            {
+                sleepData.wasSleeping = true;
+            }
 
             const int maxGroggy = 600;
 

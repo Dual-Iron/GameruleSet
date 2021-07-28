@@ -3,7 +3,7 @@ using System;
 
 namespace GameruleSet
 {
-    [BepInPlugin("com.github.dual.gameruleset", "Gamerule Set", "1.5.1")]
+    [BepInPlugin("com.github.dual.gameruleset", "Gamerule Set", "1.5.2")]
     public sealed class GameruleSetPlugin : BaseUnityPlugin
     {
         public Rules? Gamerules { get; private set; }
