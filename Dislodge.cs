@@ -267,7 +267,8 @@ namespace GameruleSet
             self.standing = false;
 
             var dir = (self.bodyChunks[0].pos - self.bodyChunks[1].pos).normalized;
-            self.flipDirection = Math.Sign(dir.x);
+            self.flipDirection = self.slideDirection = Math.Sign(dir.x);
+            self.flipFromSlide = true;
             self.bodyChunks[0].vel += dir * 8;
             self.bodyChunks[1].vel += dir * 4;
 
