@@ -55,7 +55,7 @@ namespace GameruleSet
             {
                 ref var data = ref self.player.Data().Get<DislodgeAnim>();
 
-                if (self.player.animation == EnumExt_GameruleSet.PullingSpear && data.spear.TryGetTarget(out _))
+                if (data.spear.TryGetTarget(out _))
                 {
                     for (int i = 0; i < 2; i++)
                     {
@@ -136,7 +136,7 @@ namespace GameruleSet
             ref var data = ref self.Data().Get<DislodgeAnim>();;
             if (rules.Dislodge && data.spear.TryGetTarget(out var spear))
             {
-                self.animation = EnumExt_GameruleSet.PullingSpear;
+                self.animation = Player.AnimationIndex.None;
 
                 orig(self);
 
@@ -268,7 +268,6 @@ namespace GameruleSet
 
             var dir = (self.bodyChunks[0].pos - self.bodyChunks[1].pos).normalized;
             self.flipDirection = self.slideDirection = Math.Sign(dir.x);
-            self.flipFromSlide = true;
             self.bodyChunks[0].vel += dir * 8;
             self.bodyChunks[1].vel += dir * 4;
 
@@ -282,7 +281,8 @@ namespace GameruleSet
         private void Player_checkInput(On.Player.orig_checkInput orig, Player self)
         {
             ref var data = ref self.Data().Get<DislodgeAnim>();
-            if (self.animation == EnumExt_GameruleSet.PullingSpear && data.spear.TryGetTarget(out _))
+
+            if (rules.Dislodge && data.spear.TryGetTarget(out _))
             {
                 var tempStandStill = self.standStillOnMapButton;
                 self.standStillOnMapButton = false;
@@ -292,6 +292,7 @@ namespace GameruleSet
                 if (self.input[0].jmp)
                 {
                     self.animation = Player.AnimationIndex.Flip;
+                    StopPulling(ref data);
                     return;
                 }
                 
@@ -317,7 +318,7 @@ namespace GameruleSet
                     data.ripChance = startingRipChance + player.slugcatStats.throwingSkill / 10f;
                     data.time = maxTime;
                     data.graspUsed = graspUsed;
-                    player.animation = EnumExt_GameruleSet.PullingSpear;
+                    player.animation = Player.AnimationIndex.None;
                     return false;
                 }
             }
