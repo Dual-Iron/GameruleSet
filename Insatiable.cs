@@ -19,12 +19,18 @@ namespace GameruleSet
         {
             this.rules = rules;
 
+            On.ArenaGameSession.ScoreOfPlayer += ArenaGameSession_ScoreOfPlayer;
             On.OverseerTutorialBehavior.TutorialText += OverseerTutorialBehavior_TutorialText;
             On.HUD.FoodMeter.ctor += FoodMeter_ctor;
             On.Player.AddFood += Player_AddFood;
             On.Player.AddQuarterFood += Player_AddQuarterFood;
             On.Player.FoodInRoom_bool += Player_FoodInRoom_bool;
             On.Player.FoodInRoom_Room_bool += Player_FoodInRoom_Room_bool;
+        }
+
+        private int ArenaGameSession_ScoreOfPlayer(On.ArenaGameSession.orig_ScoreOfPlayer orig, ArenaGameSession self, Player player, bool inHands)
+        {
+            return orig(self, player, rules.Insatiable == 1 && inHands);
         }
 
         private void OverseerTutorialBehavior_TutorialText(On.OverseerTutorialBehavior.orig_TutorialText orig, OverseerTutorialBehavior self, string text, int wait, int time, bool hideHud)
