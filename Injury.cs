@@ -235,7 +235,7 @@ namespace GameruleSet
 
         private static void InjuredUpdate(Player self, ref InjuryData data)
         {
-            // Aerobic level decreases slower: https://www.desmos.com/calculator/c0aagoznp1
+            // Aerobic level decreases slower
             if (self.aerobicLevel < data.lastAerobicLevel)
                 self.aerobicLevel -= (self.aerobicLevel - data.lastAerobicLevel) * (data.injury * data.injury * 0.9f);
 
