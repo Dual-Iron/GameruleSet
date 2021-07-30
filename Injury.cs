@@ -237,7 +237,7 @@ namespace GameruleSet
         {
             // Aerobic level decreases slower
             if (self.aerobicLevel < data.lastAerobicLevel)
-                self.aerobicLevel -= (self.aerobicLevel - data.lastAerobicLevel) * (data.injury * data.injury * 0.9f);
+                self.aerobicLevel -= (self.aerobicLevel - data.lastAerobicLevel) * (data.injury * data.injury * 0.75f);
 
             // If exhausted, experience pain
             if (self.aerobicLevel >= 1 && data.painTime == 0 || data.shouldPain)
