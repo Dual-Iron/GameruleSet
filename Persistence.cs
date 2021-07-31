@@ -45,8 +45,6 @@ namespace GameruleSet
             On.SaveState.AbstractCreatureToString_AbstractCreature_WorldCoordinate += SaveState_AbstractCreatureToString_AbstractCreature_WorldCoordinate;
             IL.RegionState.AdaptWorldToRegionState += RegionState_AdaptWorldToRegionState;
             On.RegionState.CreatureToStringInDenPos += RegionState_CreatureToStringInDenPos;
-
-            On.Spear.ChangeMode += Spear_ChangeMode;
             On.RegionState.AdaptRegionStateToWorld += RegionState_AdaptRegionStateToWorld;
         }
 
@@ -265,15 +263,15 @@ namespace GameruleSet
                         !gameData.dontSave.Contains(o.ID) &&
                         PersistenceApplies(ref room, ref rain, self.world, o.pos))
                     {
-                        foreach (var stick in o.stuckObjects)
-                        {
-                            if (stick.A == o)
-                            {
-                                self.savedSticks.Add(stick.SaveToString(abstractRoom.index));
-                            }
-                        }
-
                         self.savedObjects.Add(o.ToString());
+                    }
+
+                    foreach (var stick in o.stuckObjects)
+                    {
+                        if (stick.A == o)
+                        {
+                            self.savedSticks.Add(stick.SaveToString(abstractRoom.index));
+                        }
                     }
                 }
             }
@@ -308,18 +306,6 @@ namespace GameruleSet
             }
 
             return roomRain.rainReach[coord.Tile.x] > coord.Tile.y;
-        }
-
-        private void Spear_ChangeMode(On.Spear.orig_ChangeMode orig, Spear self, Weapon.Mode newMode)
-        {
-            orig(self, newMode);
-            if (rules.StableSpears.Value && newMode == Weapon.Mode.StuckInWall)
-            {
-                if (self.abstractSpear.stuckInWallCycles >= 0)
-                    self.abstractSpear.stuckInWallCycles = int.MaxValue;
-                else
-                    self.abstractSpear.stuckInWallCycles = int.MinValue;
-            }
         }
     }
 }

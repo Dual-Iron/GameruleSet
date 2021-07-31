@@ -75,6 +75,7 @@ namespace GameruleSet
             new Corpulent(this);
             new Insatiable(this);
             new Dislodge(this);
+            new StableSpears(this);
             new Persistence(this);
             new CycleLength(this);
             new SaveShelterPositions(this);
