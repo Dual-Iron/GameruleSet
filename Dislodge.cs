@@ -327,7 +327,7 @@ namespace GameruleSet
 
         private void Spear_ChangeMode(On.Spear.orig_ChangeMode orig, Spear self, Weapon.Mode newMode)
         {
-            if (rules.Dislodge && self.mode == Weapon.Mode.StuckInWall)
+            if (rules.Dislodge && self.mode == Weapon.Mode.StuckInWall && self.mode != newMode)
             {
                 if (self.abstractSpear.stuckInWallCycles >= 0)
                 {
