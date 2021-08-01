@@ -221,10 +221,9 @@ namespace GameruleSet
                 return;
             }
 
-            self.forceSleepCounter = Math.Max(0, sleepData.sleepingFor - startCurl);
-
-            if (self.forceSleepCounter > 0)
+            if (sleepData.sleepingFor > startCurl)
             {
+                self.forceSleepCounter = sleepData.sleepingFor - startCurl;
                 sleepData.wasSleeping = true;
             }
 
