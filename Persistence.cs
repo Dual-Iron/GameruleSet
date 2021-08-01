@@ -39,6 +39,7 @@ namespace GameruleSet
         {
             this.rules = rules;
 
+            On.Room.ReadyForAI += Room_ReadyForAI;
             On.Room.Loaded += Room_Loaded;
             On.AbstractCreature.Die += AbstractCreature_Die;
             On.SaveState.AbstractCreatureFromString += SaveState_AbstractCreatureFromString;
@@ -46,6 +47,25 @@ namespace GameruleSet
             IL.RegionState.AdaptWorldToRegionState += RegionState_AdaptWorldToRegionState;
             On.RegionState.CreatureToStringInDenPos += RegionState_CreatureToStringInDenPos;
             On.RegionState.AdaptRegionStateToWorld += RegionState_AdaptRegionStateToWorld;
+        }
+
+        private void Room_ReadyForAI(On.Room.orig_ReadyForAI orig, Room self)
+        {
+            int startIndex = self.abstractRoom.entities.Count;
+
+            orig(self);
+
+            if (self.abstractRoom.world.game.IsStorySession)
+            {
+                ref var data = ref self.abstractRoom.world.game.Data().Get<GameData>();
+                for (int i = startIndex; i < self.abstractRoom.entities.Count; i++)
+                {
+                    if (self.abstractRoom.entities[i] is AbstractPhysicalObject o)
+                    {
+                        data.dontSave.Add(o.ID);
+                    }
+                }
+            }
         }
 
         private void Room_Loaded(On.Room.orig_Loaded orig, Room self)
