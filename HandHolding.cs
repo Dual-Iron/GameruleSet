@@ -31,7 +31,7 @@ namespace GameruleSet
 
         private static bool WannaHoldHands(Player player)
         {
-            return player.input[0].pckp && player.input[0].mp;
+            return player.mapInput.pckp && player.mapInput.mp;
         }
 
         private static bool RefuseHandHolding(ScavengerAI self, Player p)
@@ -53,6 +53,7 @@ namespace GameruleSet
                 return orig(self) && (self.privGoThroughFloors || self.owner.grabbedBy.Any(g => !CanHoldHand(g?.grabber)));
             }
 
+            On.Player.checkInput += Player_checkInput;
             On.Scavenger.Update += Scavenger_Update1;
             On.Creature.Die += Creature_Die;
             IL.Scavenger.MidRangeUpdate += Scavenger_MidRangeUpdate;
@@ -77,6 +78,22 @@ namespace GameruleSet
             On.Player.HeavyCarry += Player_HeavyCarry;
             On.Player.Grabability += Player_Grabability;
             this.rules = rules;
+        }
+
+        private void Player_checkInput(On.Player.orig_checkInput orig, Player self)
+        {
+            var temp = self.standStillOnMapButton;
+
+            self.standStillOnMapButton = false;
+
+            orig(self);
+
+            self.standStillOnMapButton = temp;
+
+            if (WannaHoldHands(self))
+            {
+                self.input[0].mp = false;
+            }
         }
 
         private void Player_ReleaseObject(On.Player.orig_ReleaseObject orig, Player self, int grasp, bool eu)
@@ -186,7 +203,9 @@ namespace GameruleSet
         private bool Player_CanIPickThisUp(On.Player.orig_CanIPickThisUp orig, Player self, PhysicalObject obj)
         {
             if (!orig(self, obj))
+            {
                 return false;
+            }
 
             if (WannaHoldHands(self))
             {
@@ -424,17 +443,7 @@ namespace GameruleSet
 
             if (self.owner.owner is Player player)
             {
-                if (self.limbNumber == player.FreeHand() && self.owner is PlayerGraphics g && 
-                    WannaHoldHands(player) && CanHoldHand(g.objectLooker.currentMostInteresting) &&
-                    (g.objectLooker.currentMostInteresting is not Scavenger s || !RefuseHandHolding(s.AI, player)))
-                {
-                    self.mode = Limb.Mode.HuntRelativePosition;
-                    self.retractCounter = 0;
-                    self.huntSpeed = 5;
-                    self.quickness = 1;
-                    self.relativeHuntPos = g.lookDirection * Mathf.Min(20, (self.pos - g.objectLooker.currentMostInteresting.firstChunk.pos).magnitude / 2);
-                }
-                else if (CanHoldHand(player.grasps[self.limbNumber]?.grabbed))
+                if (CanHoldHand(player.grasps[self.limbNumber]?.grabbed))
                 {
                     var pos = player.grasps[self.limbNumber].Data().Get<GraspData>().handPos;
                     if (pos != default)
@@ -448,6 +457,16 @@ namespace GameruleSet
                         if (player.grasps[self.limbNumber].grabbed is not Scavenger)
                             self.pos = self.absoluteHuntPos;
                     }
+                }
+                else if (self.limbNumber == player.FreeHand() && self.owner is PlayerGraphics g && 
+                    WannaHoldHands(player) && CanHoldHand(g.objectLooker.currentMostInteresting) &&
+                    (g.objectLooker.currentMostInteresting is not Scavenger s || !RefuseHandHolding(s.AI, player)))
+                {
+                    self.mode = Limb.Mode.HuntRelativePosition;
+                    self.retractCounter = 0;
+                    self.huntSpeed = 5;
+                    self.quickness = 1;
+                    self.relativeHuntPos = g.lookDirection * Mathf.Min(20, (self.pos - g.objectLooker.currentMostInteresting.firstChunk.pos).magnitude / 2);
                 }
             }
         }
