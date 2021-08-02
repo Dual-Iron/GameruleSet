@@ -84,7 +84,7 @@ namespace GameruleSet
         {
             var temp = self.standStillOnMapButton;
 
-            self.standStillOnMapButton = false;
+            self.standStillOnMapButton = self.standStillOnMapButton && !self.input[0].pckp;
 
             orig(self);
 
