@@ -11,7 +11,7 @@ namespace GameruleSet
     public class Persistence
     {
         static readonly WeakTable<AbstractCreature, AbstractCreatureData> critData = new(_ => new());
-        static readonly WeakTable<RainWorldGame, GameData> gameData = new(_ => new());
+        static readonly WeakTable<RainWorldGame, GameData> gameData = new(_ => new(), false);
 
         sealed class AbstractCreatureData
         {
@@ -21,7 +21,7 @@ namespace GameruleSet
 
         sealed class GameData
         {
-            public WeakRef<HashSet<EntityID>> dontSave = new(new());
+            public HashSet<EntityID> dontSave = new();
         }
 
         private readonly Rules rules;
@@ -53,8 +53,7 @@ namespace GameruleSet
                 {
                     if (self.abstractRoom.entities[i] is AbstractPhysicalObject o)
                     {
-                        data.dontSave.TryGetTarget(out var set);
-                        set.Add(o.ID);
+                        data.dontSave.Add(o.ID);
                     }
                 }
             }
@@ -76,8 +75,7 @@ namespace GameruleSet
                         (o is not DataPearl.AbstractDataPearl d || d.dataPearlType != DataPearl.AbstractDataPearl.DataPearlType.Red_stomach) &&
                         o.type != AbstractPhysicalObject.AbstractObjectType.NSHSwarmer)
                     {                        
-                        data.dontSave.TryGetTarget(out var set);
-                        set.Add(o.ID);
+                        data.dontSave.Add(o.ID);
                     }
                 }
             }
@@ -250,7 +248,6 @@ namespace GameruleSet
                 return;
 
             var data = gameData[self.world.game];
-            data.dontSave.TryGetTarget(out var set);
 
             for (int i = 0; i < self.world.NumberOfRooms; i++)
             {
@@ -274,7 +271,7 @@ namespace GameruleSet
                         o.type != AbstractPhysicalObject.AbstractObjectType.Rock &&
                         (o is not AbstractSpear s || o.GetType() != typeof(AbstractSpear) || s.explosive || !s.stuckInWall && o.stuckObjects.Any(s => s != null)) &&
                         (o is not AbstractConsumable c || c.isConsumed && AbstractConsumable.IsTypeConsumable(o.type)) &&
-                        !set.Contains(o.ID) &&
+                        !data.dontSave.Contains(o.ID) &&
                         PersistenceApplies(ref room, ref rain, self.world, o.pos))
                     {
                         self.savedObjects.Add(o.ToString());
