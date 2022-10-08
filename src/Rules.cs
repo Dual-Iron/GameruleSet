@@ -74,7 +74,7 @@ namespace GameruleSet
             new Karmic(this);
             new Corpulent(this);
             new Insatiable(this);
-            new Dislodge(this);
+            new Dislodge(); // Backported from sapcat
             new StableSpears(this);
             new Persistence(this);
             new CycleLength(this);

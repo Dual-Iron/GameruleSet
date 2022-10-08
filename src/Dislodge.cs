@@ -1,387 +1,501 @@
 ﻿using RWCustom;
-using WeakTables;
-using System;
 using System.Linq;
+using System;
 using UnityEngine;
+using static LizardTongue;
+using static Player.AnimationIndex;
 using static Player.BodyModeIndex;
+using WeakTables;
+using System.Collections.Generic;
 
 namespace GameruleSet
 {
-    public class Dislodge
+    sealed class DislodgeData
     {
-        const float startingRipChance = 1 / 3f;
-        const int stunDuration = 8;
-        const int maxTime = 30;
+        public WeakRef<Spear> Spear;
+        public int Grasp;
+        public float Time;
+        public int NoThrowTime;
 
-        static readonly WeakTable<Player, DislodgeAnim> dislodgeData = new(_ => new());
-
-        sealed class DislodgeAnim
+        public void Reset()
         {
-            public WeakRef<Spear> spear = new();
-            public float time;
-            public int graspUsed;
-            public float ripChance;
+            Grasp = default;
+            NoThrowTime = default;
+            Spear = default;
+            Time = default;
         }
 
-        private readonly Rules rules;
-
-        public Dislodge(Rules rules)
+        public bool IsActive()
         {
-            this.rules = rules;
+            return Spear != null && Spear.TryGetTarget(out _);
+        }
 
-            On.PlayerGraphics.DrawSprites += PlayerGraphics_DrawSprites;
+        public bool IsActive(out Spear spear)
+        {
+            if (Spear == null) {
+                spear = null;
+                return false;
+            }
+            return Spear.TryGetTarget(out spear);
+        }
+    }
+
+    sealed class RoomData
+    {
+        public readonly Dictionary<BeamPos, BeamData> Beams = new();
+    }
+
+    readonly struct BeamPos
+    {
+        public readonly int X;
+        public readonly int Y;
+
+        public BeamPos(int x, int y)
+        {
+            X = x;
+            Y = y;
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is BeamPos pos && X == pos.X && Y == pos.Y;
+        }
+
+        public override int GetHashCode()
+        {
+            int hashCode = 1861411795;
+            hashCode = hashCode * -1521134295 + X.GetHashCode();
+            hashCode = hashCode * -1521134295 + Y.GetHashCode();
+            return hashCode;
+        }
+    }
+
+    readonly struct BeamData
+    {
+        public readonly bool Horizontal;
+        public readonly bool Vertical;
+
+        public BeamData(bool horizontal, bool vertical)
+        {
+            Horizontal = horizontal;
+            Vertical = vertical;
+        }
+    }
+
+    sealed class Dislodge
+    {
+        static readonly WeakTable<Player, DislodgeData> dislodgeData = new(_ => new());
+        static readonly WeakTable<Room, RoomData> roomData = new(_ => new(), verify: false);
+
+        const float DislodgeChance = 0.65f;
+        const float DislodgeTime = 30;
+
+        private static bool IsStuckVertically(Spear s)
+        {
+            return s.abstractSpear.stuckInWallCycles < 0;
+        }
+
+        private static bool IsDislodgingFromWall(Player self)
+        {
+            return self.bodyChunks[1].ContactPoint.y >= 0 && self.bodyMode is not ClimbIntoShortCut and not CorridorClimb;
+        }
+
+        private static Vector2 TileStuckIn(Spear s)
+        {
+            if (IsStuckVertically(s)) {
+                return s.firstChunk.pos + 20 * (s.IsTileSolid(0, 0, 1) ? Vector2.up : -Vector2.up);
+            }
+            return s.firstChunk.pos + 20 * (s.IsTileSolid(0, 1, 0) ? Vector2.right : -Vector2.right);
+        }
+
+        public Dislodge()
+        {
+            // For graphics, see PlayerGraphicsSharedHooks.cs
             On.PlayerGraphics.Update += PlayerGraphics_Update;
-            On.Player.UpdateAnimation += Player_UpdateAnimation;
-            On.Player.checkInput += Player_checkInput;
-            On.Creature.Grab += Creature_Grab;
-            On.Player.CanIPickThisUp += Player_CanIPickThisUp;
-            On.Spear.ChangeMode += Spear_ChangeMode;
-        }
+            On.PlayerGraphics.DrawSprites += PlayerGraphics_DrawSprites;
 
-        private bool IsOnWall(Player self)
-        {
-            return self.bodyChunks[1].ContactPoint.y >= 0 && self.bodyMode != ClimbIntoShortCut && self.bodyMode != CorridorClimb;
-        }
-
-        private void PlayerGraphics_DrawSprites(On.PlayerGraphics.orig_DrawSprites orig, PlayerGraphics self, RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, float timeStacker, Vector2 camPos)
-        {
-            orig(self, sLeaser, rCam, timeStacker, camPos);
-
-            try
-            {
-                var data = dislodgeData[self.player];
-
-                if (data.spear.TryGetTarget(out _))
-                {
-                    for (int i = 0; i < 2; i++)
-                    {
-                        if (self.player.grasps[i] != null)
-                        {
-                            continue;
-                        }
-
-                        // Use HangFromBeam hands
-                        var vector7 = Vector2.Lerp(self.hands[i].lastPos, self.hands[i].pos, timeStacker);
-                        sLeaser.sprites[7 + i].element = Futile.atlasManager.GetElementWithName("OnTopOfTerrainHand2");
-                        sLeaser.sprites[7 + i].x = vector7.x - camPos.x;
-                        sLeaser.sprites[7 + i].y = vector7.y - camPos.y;
-                        sLeaser.sprites[7 + i].isVisible = true;
-
-                        var vector = Vector2.Lerp(self.drawPositions[0, 1], self.drawPositions[0, 0], timeStacker);
-                        var vector2 = Vector2.Lerp(self.drawPositions[1, 1], self.drawPositions[1, 0], timeStacker);
-
-                        var num = 0.5f + 0.5f * Mathf.Sin(Mathf.Lerp(self.lastBreath, self.breath, timeStacker) * 3.1415927f * 2f);
-                        if (self.player.aerobicLevel > 0.5f)
-                            vector += Custom.DirVec(vector2, vector) * Mathf.Lerp(-1f, 1f, num) * Mathf.InverseLerp(0.5f, 1f, self.player.aerobicLevel) * 0.5f;
-
-                        float num6 = 2.25f;
-                        num6 *= Mathf.Abs(Mathf.Cos(Custom.AimFromOneVectorToAnother(vector2, vector) / 360f * 3.1415927f * 2f));
-                        var vector8 = vector + Custom.RotateAroundOrigo(new Vector2((-1f + 2f * i) * num6, -3.5f), Custom.AimFromOneVectorToAnother(vector2, vector));
-                        sLeaser.sprites[5 + i].element = Futile.atlasManager.GetElementWithName("PlayerArm" + Mathf.RoundToInt(Mathf.Clamp(Vector2.Distance(vector7, vector8) / 2f, 0f, 12f)));
-                        sLeaser.sprites[5 + i].rotation = Custom.AimFromOneVectorToAnother(vector7, vector8) + 90f;
-                        sLeaser.sprites[5 + i].scaleY = Mathf.Sign(Custom.DistanceToLine(vector7, vector, vector2));
-                        sLeaser.sprites[5 + i].isVisible = true;
-                    }
-
-                    if (data.time < stunDuration && sLeaser.sprites[9].element?.name?.Length == 6)
-                        sLeaser.sprites[9].element = Futile.atlasManager.GetElementWithName("FaceStunned");
-                }
-            }
-            catch (Exception e)
-            {
-                rules.Logger.LogError(e);
-            }
+            On.Player.IsObjectThrowable += Player_IsObjectThrowable;
+            On.Player.UpdateAnimation += AnimateDislodging;
+            On.Player.checkInput += LockInput;
+            On.Creature.Grab += StartDislodgingSpear;
+            On.Player.CanIPickThisUp += FixPickup;
+            On.Spear.ChangeMode += FixChangeMode;
         }
 
         private void PlayerGraphics_Update(On.PlayerGraphics.orig_Update orig, PlayerGraphics self)
         {
             orig(self);
 
-            var data = dislodgeData[self.player];
-            if (rules.Dislodge && data.spear.TryGetTarget(out var spear))
-            {
-                var pos = self.player.room.MiddleOfTile(spear!.abstractSpear.pos);
+            var dislodge = dislodgeData[self.player];
+            if (!dislodge.IsActive(out var spear)) {
+                return;
+            }
 
-                if (data.time < maxTime - 4)
-                {
-                    self.LookAtPoint(self.player.firstChunk.pos + (self.player.firstChunk.pos - pos), 20);
-                    self.blink = 10;
-                }
+            if (dislodge.Time < DislodgeTime - 4) {
+                self.LookAtPoint(self.player.firstChunk.pos + (self.player.firstChunk.pos - spear.firstChunk.pos), 60);
+                self.blink = 10;
+            }
 
-                if (IsOnWall(self.player))
-                {
-                    self.legsDirection = (self.player.bodyChunks[1].pos - self.player.bodyChunks[0].pos).normalized;
-                }
+            if (IsDislodgingFromWall(self.player)) {
+                self.legsDirection = (self.player.bodyChunks[1].pos - self.player.bodyChunks[0].pos).normalized;
+            }
 
-                for (int i = 0; i < 2; i++)
-                {
-                    if (self.player.grasps[i] != null)
-                    {
-                        continue;
-                    }
-
-                    self.hands[i].mode = Limb.Mode.HuntAbsolutePosition;
-                    self.hands[i].absoluteHuntPos = pos - spear.rotation * 8 * i;
-                    self.hands[i].pos = self.hands[i].absoluteHuntPos;
-                }
+            for (int i = 0; i < 2; i++) {
+                self.hands[i].mode = Limb.Mode.HuntAbsolutePosition;
+                self.hands[i].absoluteHuntPos = spear.firstChunk.pos - spear.rotation * 8 * i;
+                self.hands[i].pos = self.hands[i].absoluteHuntPos;
             }
         }
 
-        private void Player_UpdateAnimation(On.Player.orig_UpdateAnimation orig, Player self)
+        private void PlayerGraphics_DrawSprites(On.PlayerGraphics.orig_DrawSprites orig, PlayerGraphics self, RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, float timeStacker, Vector2 camPos)
         {
-            var data = dislodgeData[self];
-            if (rules.Dislodge && data.spear.TryGetTarget(out var spear))
+            orig(self, sLeaser, rCam, timeStacker, camPos);
+
+            var dislodge = dislodgeData[self.player];
+            if (!dislodge.IsActive()) {
+                return;
+            }
+
+            for (int i = 0; i < 2; i++) {
+                if (self.player.grasps[i] != null) {
+                    continue;
+                }
+
+                ShowBeamHandSprite(self, sLeaser, timeStacker, camPos, i);
+            }
+
+            if (sLeaser.sprites[9].element.name.Length == 6 && dislodge.Time < 8) {
+                sLeaser.sprites[9].element = Futile.atlasManager.GetElementWithName("FaceStunned");
+            }
+
+            sLeaser.sprites[4].isVisible = true;
+
+            static void ShowBeamHandSprite(PlayerGraphics self, RoomCamera.SpriteLeaser sLeaser, float timeStacker, Vector2 camPos, int hand)
             {
-                self.animation = Player.AnimationIndex.None;
+                // Use HangFromBeam hands
+                var vector7 = Vector2.Lerp(self.hands[hand].lastPos, self.hands[hand].pos, timeStacker);
+                sLeaser.sprites[7 + hand].element = Futile.atlasManager.GetElementWithName("OnTopOfTerrainHand2");
+                sLeaser.sprites[7 + hand].x = vector7.x - camPos.x;
+                sLeaser.sprites[7 + hand].y = vector7.y - camPos.y;
+                sLeaser.sprites[7 + hand].isVisible = true;
+
+                sLeaser.sprites[5 + hand].isVisible = true;
+            }
+        }
+
+        private static bool Player_IsObjectThrowable(On.Player.orig_IsObjectThrowable orig, Player self, PhysicalObject obj)
+        {
+            return dislodgeData[self].NoThrowTime == 0 && orig(self, obj);
+        }
+
+        private void AnimateDislodging(On.Player.orig_UpdateAnimation orig, Player self)
+        {
+            var dislodge = dislodgeData[self];
+
+            if (dislodge.IsActive(out var spear) && !spear.slatedForDeletetion && self.Consious) {
+                self.animation = (Player.AnimationIndex)(-59483);
 
                 orig(self);
 
-                var horizontal = Mathf.Abs(spear!.rotation.x) > 0.01f;
-                var target = self.room.MiddleOfTile(spear.abstractPhysicalObject.pos);
-
-                // If too far from any of the spear's body chunks, plop off
-                if ((spear.bodyChunks[0].pos - self.firstChunk.pos).sqrMagnitude > 35 * 35)
-                {
-                    RipSpear(self, ref data, spear, target);
-                    self.animation = Player.AnimationIndex.None;
-                    self.bodyMode = Stunned;
-                    self.Stun(40);
+                DoDislodgeAnimation(self, dislodge, spear);
+            }
+            else {
+                if (dislodge.NoThrowTime > 0) {
+                    dislodge.NoThrowTime--;
                 }
-                else
-                {
-                    if (IsOnWall(self))
-                    {
-                        self.bodyMode = ClimbingOnBeam;
-                        self.standing = true;
-                        self.firstChunk.pos.y = self.room.MiddleOfTile(self.firstChunk.pos).y + 4;
-                        self.firstChunk.vel = Vector2.zero;
-
-                        self.bodyChunks[0].vel -= 1.25f * (target - self.bodyChunks[0].pos - new Vector2(5 * -spear.rotation.x, 10)).normalized;
-                        self.bodyChunks[1].vel += 2f * (target - self.bodyChunks[1].pos).normalized;
-
-                        var yDist = Mathf.Abs(self.bodyChunks[1].pos.y - target.y);
-                        if (yDist < 1)
-                        {
-                            self.bodyChunks[1].pos.y = target.y;
-                            self.bodyChunks[1].vel.y *= 0.2f;
-                        }
-                        else if (yDist < 5)
-                        {
-                            self.bodyChunks[1].vel.y *= 0.5f;
-                        }
-                    }
-                    else if (horizontal || Math.Abs(self.bodyChunks[0].pos.x - target.x) > 5)
-                    {
-                        var v = Math.Sign(target.x - self.bodyChunks[0].pos.x);
-                        self.bodyChunks[0].vel.x -= v;
-                        self.bodyChunks[1].vel.x += v;
-                    }
-
-                    if (data.time > 0)
-                    {
-                        float distance = Math.Abs(horizontal ? target.y - self.bodyChunks[1].pos.y : target.x - self.bodyChunks[0].pos.x);
-                        float delta = -1f / Mathf.Clamp(distance / 15f, 1f, 2f);
-
-                        if (self.bodyMode == Crawl || self.bodyMode == ClimbingOnBeam)
-                        {
-                            delta *= 0.85f;
-                        }
-                        else if (self.bodyMode != Stand)
-                        {
-                            delta *= 0.70f;
-                        }
-
-                        data.time += delta;
-
-                        if (data.time <= 0)
-                        {
-                            if (UnityEngine.Random.value < data.ripChance)
-                                RipSpear(self, ref data, spear, target);
-                            else
-                                FirstYank(self, spear, target);
-
-                            data.time = maxTime;
-                            data.ripChance += 0.1f;
-                        }
-                    }
+                else {
+                    dislodge.Reset();
                 }
-            }
-            else
-            {
-                orig(self);
-                StopPulling(ref data);
-            }
-        }
 
-        private static void StopPulling(ref DislodgeAnim data)
-        {
-            if (data.spear.TryGetTarget(out _))
-                data.spear = new();
-            data.time = 0;
-        }
-
-        private void FirstYank(Player self, Spear spear, Vector2 target)
-        {
-            self.room.PlaySound(SoundID.Spear_Fragment_Bounce, spear.firstChunk.pos, 0.65f, 1.2f);
-
-            if (IsOnWall(self))
-                self.room.PlaySound(SoundID.Slugcat_Normal_Jump, self.mainBodyChunk);
-
-            int num = UnityEngine.Random.Range(0, 3);
-            for (int i = 0; i < num; i++)
-            {
-                var splashDir = -spear.rotation.normalized + Custom.DegToVec(UnityEngine.Random.value * 90 - 45);
-                var pos = target + splashDir * 3f;
-                var speed = UnityEngine.Random.value * 5;
-                self.room.AddObject(new WaterDrip(pos, splashDir * speed, true));
-            }
-
-            var dir = (self.bodyChunks[0].pos - self.bodyChunks[1].pos).normalized;
-            self.bodyChunks[0].vel += dir * 6;
-            self.bodyChunks[1].vel -= dir * 3;
-
-            self.AerobicIncrease(0.5f);
-        }
-
-        private void RipSpear(Player self, ref DislodgeAnim data, Spear spear, Vector2 target)
-        {
-            int num = UnityEngine.Random.Range(1, 4);
-            for (int i = 0; i < num; i++)
-            {
-                var splashDir = -spear.rotation.normalized + Custom.DegToVec(UnityEngine.Random.value * 120 - 60);
-                var pos = target + splashDir * 4f;
-                var speed = 1 + UnityEngine.Random.value * 5;
-                self.room.AddObject(new WaterDrip(pos, splashDir * speed, true));
-            }
-
-            if (IsOnWall(self))
-                self.room.PlaySound(SoundID.Slugcat_Super_Jump, self.firstChunk);
-
-            self.room.PlaySound(SoundID.Spear_Stick_In_Wall, spear.firstChunk.pos, 1f, 1.2f);
-
-            self.animation = Player.AnimationIndex.Flip;
-            self.standing = false;
-
-            var dir = (self.bodyChunks[0].pos - self.bodyChunks[1].pos).normalized;
-            self.flipDirection = self.slideDirection = Math.Sign(dir.x);
-            self.bodyChunks[0].vel += dir * 8;
-            self.bodyChunks[1].vel += dir * 4;
-
-            self.SlugcatGrab(spear, data.graspUsed);
-
-            self.AerobicIncrease(0.5f);
-
-            StopPulling(ref data);
-        }
-
-        private void Player_checkInput(On.Player.orig_checkInput orig, Player self)
-        {
-            var data = dislodgeData[self];
-
-            if (rules.Dislodge && data.spear.TryGetTarget(out _))
-            {
-                var tempStandStill = self.standStillOnMapButton;
-                self.standStillOnMapButton = false;
-                orig(self);
-                self.standStillOnMapButton = tempStandStill;
-
-                if (self.input[0].jmp)
-                {
-                    self.animation = Player.AnimationIndex.Flip;
-                    StopPulling(ref data);
-                    return;
-                }
-                
-                self.input[0] = new (self.room.game.rainWorld.options.controls[self.playerState.playerNumber].gamePad, 0, 0, false, false, false, false, false);
-            }
-            else
-            {
                 orig(self);
             }
         }
 
-        private bool Creature_Grab(On.Creature.orig_Grab orig, Creature self, PhysicalObject obj, int graspUsed, int chunkGrabbed, Creature.Grasp.Shareability shareability, float dominance, bool overrideEquallyDominant, bool pacifying)
+        private void DoDislodgeAnimation(Player plr, DislodgeData dislodge, Spear spear)
         {
-            if (obj is Spear s && s.mode == Weapon.Mode.StuckInWall)
+            var horizontal = Mathf.Abs(spear.rotation.x) > 0.01f;
+            var target = TileStuckIn(spear);
+
+            // If too far from any of the spear's body chunks, plop off
+            if ((spear.bodyChunks[0].pos - plr.firstChunk.pos).sqrMagnitude > 35 * 35) {
+                dislodge.Reset();
+
+                plr.animation = None;
+                plr.bodyMode = Stunned;
+                plr.Stun(40);
+                return;
+            }
+
+            if (plr.dontGrabStuff < 10) {
+                plr.dontGrabStuff = 10;
+            }
+
+            bool fromWall = IsDislodgingFromWall(plr);
+
+            if (fromWall) {
+                plr.bodyMode = ClimbingOnBeam;
+                plr.standing = true;
+
+                plr.firstChunk.pos.y = plr.room.MiddleOfTile(plr.firstChunk.pos).y + 4;
+                plr.firstChunk.vel = Vector2.zero;
+
+                if (IsStuckVertically(spear)) {
+                    if (plr.bodyChunks[0].pos.y + 20 > target.y) {
+                        plr.bodyChunks[0].pos.y -= 20;
+                    }
+                    plr.bodyChunks[0].vel.y -= 1.25f * plr.room.gravity;
+                }
+                else {
+                    plr.bodyChunks[0].vel -= 1.25f * (target - plr.bodyChunks[0].pos - new Vector2(5 * -spear.rotation.x, 10)).normalized;
+                }
+
+                plr.bodyChunks[1].vel += 2f * (target - plr.bodyChunks[1].pos).normalized;
+
+                var yDist = Mathf.Abs(plr.bodyChunks[1].pos.y - target.y);
+                if (yDist < 1) {
+                    plr.bodyChunks[1].pos.y = target.y;
+                    plr.bodyChunks[1].vel.y *= 0.2f;
+                }
+                else if (yDist < 5) {
+                    plr.bodyChunks[1].vel.y *= 0.5f;
+                }
+            }
+            else if (horizontal || Math.Abs(plr.bodyChunks[0].pos.x - target.x) > 5) {
+                var v = Math.Sign(target.x - plr.bodyChunks[0].pos.x);
+                plr.bodyChunks[0].vel.x -= v;
+                plr.bodyChunks[1].vel.x += v;
+            }
+
+            if (dislodge.Time > 0) {
+                float distance = Math.Abs(horizontal ? target.y - plr.bodyChunks[1].pos.y : target.x - plr.bodyChunks[0].pos.x);
+                float delta = -1f / Mathf.Clamp(distance / 15f, 1f, 2f);
+
+                if (plr.bodyMode == Crawl || plr.bodyMode == ClimbingOnBeam) {
+                    delta *= 0.85f;
+                }
+                else if (plr.bodyMode != Stand) {
+                    delta *= 0.70f;
+                }
+
+                dislodge.Time += delta;
+
+                if (dislodge.Time <= 0) {
+                    if (UnityEngine.Random.value < DislodgeChance) {
+                        SucceedDislodge(dislodge);
+                    }
+                    else {
+                        FailDislodge();
+                    }
+
+                    dislodge.Time = DislodgeTime;
+                }
+            }
+
+            void SucceedDislodge(DislodgeData dislodge)
             {
-                if (self is not Player player)
+                int droplets = UnityEngine.Random.Range(1, 4);
+                for (int i = 0; i < droplets; i++) {
+                    var splashDir = -spear.rotation.normalized + Custom.DegToVec(UnityEngine.Random.value * 120 - 60);
+                    var pos = target + splashDir * 4f;
+                    var speed = 1 + UnityEngine.Random.value * 5;
+                    plr.room.AddObject(new WaterDrip(pos, splashDir * speed, true));
+                }
+
+                if (fromWall) {
+                    plr.room.PlaySound(SoundID.Slugcat_Super_Jump, plr.firstChunk);
+                }
+
+                plr.room.PlaySound(SoundID.Spear_Stick_In_Wall, spear.firstChunk.pos, 1f, 1.2f);
+
+                plr.animation = Flip;
+                plr.standing = false;
+
+                var dir = (plr.bodyChunks[0].pos - plr.bodyChunks[1].pos).normalized;
+                plr.flipDirection = plr.slideDirection = Math.Sign(dir.x);
+                plr.bodyChunks[0].vel += dir * 8;
+                plr.bodyChunks[1].vel += dir * 4;
+
+                plr.SlugcatGrab(spear, dislodge.Grasp);
+
+                plr.AerobicIncrease(0.5f);
+
+                dislodge.Reset();
+                dislodge.NoThrowTime = 15;
+            }
+
+            void FailDislodge()
+            {
+                plr.room.PlaySound(SoundID.Spear_Fragment_Bounce, spear.firstChunk.pos, 0.65f, 1.2f);
+
+                if (fromWall) {
+                    plr.room.PlaySound(SoundID.Slugcat_Normal_Jump, plr.mainBodyChunk);
+                }
+
+                int num = UnityEngine.Random.Range(0, 3);
+                for (int i = 0; i < num; i++) {
+                    var splashDir = -spear.rotation.normalized + Custom.DegToVec(UnityEngine.Random.value * 90 - 45);
+                    var pos = target + splashDir * 3f;
+                    var speed = UnityEngine.Random.value * 5;
+                    plr.room.AddObject(new WaterDrip(pos, splashDir * speed, true));
+                }
+
+                var dir = (plr.bodyChunks[0].pos - plr.bodyChunks[1].pos).normalized;
+                plr.bodyChunks[0].vel += dir * 6;
+                plr.bodyChunks[1].vel -= dir * 3;
+
+                plr.AerobicIncrease(0.5f);
+            }
+        }
+
+        private void LockInput(On.Player.orig_checkInput orig, Player self)
+        {
+            var dislodge = dislodgeData[self];
+
+            if (!dislodge.IsActive()) {
+                orig(self);
+                return;
+            }
+
+            var tempStandStill = self.standStillOnMapButton;
+            self.standStillOnMapButton = false;
+            orig(self);
+            self.standStillOnMapButton = tempStandStill;
+
+            if (self.input[0].jmp) {
+                self.animation = Flip;
+                dislodge.Reset();
+                return;
+            }
+
+            self.input[0] = default;
+        }
+
+        private bool StartDislodgingSpear(On.Creature.orig_Grab orig, Creature self, PhysicalObject obj, int graspUsed, int c, Creature.Grasp.Shareability sh, float d, bool oed, bool p)
+        {
+            if (obj is Spear s && s.mode == Weapon.Mode.StuckInWall) {
+                if (self is not Player player || !Rules.CurrentRules.Dislodge) {
                     return false;
+                }
 
-                var data = dislodgeData[player];
-                if (!data.spear.TryGetTarget(out _))
-                {
-                    data.spear = new(s);
-                    data.ripChance = startingRipChance + player.slugcatStats.throwingSkill / 10f;
-                    data.time = maxTime;
-                    data.graspUsed = graspUsed;
-                    player.animation = Player.AnimationIndex.None;
+                var dislodge = dislodgeData[player];
+
+                if (!dislodge.IsActive()) {
+                    dislodge.Spear = new(s);
+                    dislodge.Time = DislodgeTime;
+                    dislodge.Grasp = graspUsed;
+                    player.animation = None;
                     return false;
                 }
             }
-            return orig(self, obj, graspUsed, chunkGrabbed, shareability, dominance, overrideEquallyDominant, pacifying);
+            return orig(self, obj, graspUsed, c, sh, d, oed, p);
         }
 
-        private void Spear_ChangeMode(On.Spear.orig_ChangeMode orig, Spear self, Weapon.Mode newMode)
+        private void FixChangeMode(On.Spear.orig_ChangeMode orig, Spear spear, Weapon.Mode newMode)
         {
-            if (rules.Dislodge && self.mode == Weapon.Mode.StuckInWall && self.mode != newMode)
-            {
-                if (self.abstractSpear.stuckInWallCycles >= 0)
-                {
-                    self.room.GetTile(self.stuckInWall!.Value).horizontalBeam = false;
-                    for (int i = -1; i < 2; i += 2)
-                    {
-                        if (!self.room.GetTile(self.stuckInWall.Value + new Vector2(20f * i, 0f)).Solid)
-                        {
-                            self.room.GetTile(self.stuckInWall.Value + new Vector2(20f * i, 0f)).horizontalBeam = false;
-                        }
-                    }
-                }
-                else
-                {
-                    self.room.GetTile(self.stuckInWall!.Value).verticalBeam = false;
-                    for (int j = -1; j < 2; j += 2)
-                    {
-                        if (!self.room.GetTile(self.stuckInWall.Value + new Vector2(0f, 20f * j)).Solid)
-                        {
-                            self.room.GetTile(self.stuckInWall.Value + new Vector2(0f, 20f * j)).verticalBeam = false;
-                        }
-                    }
-                }
-                self.abstractSpear.stuckInWallCycles = 0;
+            if (newMode == Weapon.Mode.StuckInWall && spear.mode != newMode) {
+                StoreBeamState();
             }
-            orig(self, newMode);
+            else if (spear.mode == Weapon.Mode.StuckInWall && spear.mode != newMode) {
+                UndoStuckInWall();
+            }
+
+            orig(spear, newMode);
+
+            void StoreBeamState()
+            {
+                var roomData = Dislodge.roomData[spear.room];
+                var wall = spear.stuckInWall!.Value;
+
+                if (spear.throwDir.y != 0) {
+                    for (int i = 0; i < 3; i++) {
+                        Room.Tile tile = spear.room.GetTile(wall + new Vector2(0f, 20f * (i - 1)));
+
+                        if (!roomData.Beams.ContainsKey(new(tile.X, tile.Y))) {
+                            roomData.Beams[new(tile.X, tile.Y)] = new(tile.horizontalBeam, tile.verticalBeam);
+                        }
+                    }
+                }
+                else {
+                    for (int i = 0; i < 3; i++) {
+                        Room.Tile tile = spear.room.GetTile(wall + new Vector2(20f * (i - 1), 0f));
+
+                        if (!roomData.Beams.ContainsKey(new(tile.X, tile.Y))) {
+                            roomData.Beams[new(tile.X, tile.Y)] = new(tile.horizontalBeam, tile.verticalBeam);
+                        }
+                    }
+                }
+            }
+
+            void UndoStuckInWall()
+            {
+                var roomData = Dislodge.roomData[spear.room];
+                var wall = spear.stuckInWall!.Value;
+
+                if (IsStuckVertically(spear)) {
+                    for (int i = 0; i < 3; i++) {
+                        Room.Tile tile = spear.room.GetTile(wall + new Vector2(0f, 20f * (i - 1)));
+
+                        tile.verticalBeam = roomData.Beams[new(tile.X, tile.Y)].Vertical;
+                    }
+                }
+                else {
+                    for (int i = 0; i < 3; i++) {
+                        Room.Tile tile = spear.room.GetTile(wall + new Vector2(20f * (i - 1), 0f));
+
+                        tile.horizontalBeam = roomData.Beams[new(tile.X, tile.Y)].Horizontal;
+                    }
+                }
+
+                spear.abstractSpear.stuckInWallCycles = 0;
+            }
         }
 
-        private bool Player_CanIPickThisUp(On.Player.orig_CanIPickThisUp orig, Player self, PhysicalObject obj)
+        private bool FixPickup(On.Player.orig_CanIPickThisUp orig, Player self, PhysicalObject obj)
         {
-            if (dislodgeData[self].time > 0)
+            return !dislodgeData[self].IsActive() && (orig(self, obj) || obj is Spear s && CanDislodgeSpear(s));
+
+            bool CanDislodgeSpear(Spear s)
+            {
+                if (!Rules.CurrentRules.Dislodge || self.bodyMode == Default || self.input[0].x != 0 || self.input[0].y != 0) {
+                    return false;
+                }
+
+                if (self.bodyMode is Stand or Crawl && self.animation is not None) {
+                    return false;
+                }
+
+                if (self.bodyMode == ClimbingOnBeam && self.animation is not HangFromBeam and not ClimbOnBeam) {
+                    return false;
+                }
+
+                if (self.mainBodyChunk.vel.sqrMagnitude > 5f || self.mainBodyChunk.vel.y < -0.01f) {
+                    return false;
+                }
+
+                // Spear must be in a wall and player must be within 30 units of it
+                if (s.mode == Weapon.Mode.StuckInWall && (s.bodyChunks[0].pos - self.firstChunk.pos).magnitude < 25) {
+                    // If climbing on a beam but not hanging on the spear, boot
+                    if (self.animation == HangFromBeam) {
+                        if (IsStuckVertically(s) || self.abstractPhysicalObject.pos.y != s.abstractPhysicalObject.pos.y) {
+                            return false;
+                        }
+                    }
+
+                    // If climbing on a beam but not climbing the spear, boot
+                    // Also, can only do this with up-thrown spears
+                    if (self.animation == ClimbOnBeam) {
+                        if (!IsStuckVertically(s) || !s.IsTileSolid(0, 0, 1) || self.abstractPhysicalObject.pos.x != s.abstractPhysicalObject.pos.x) {
+                            return false;
+                        }
+                    }
+
+                    // Must have an open hand. This prevents dislodging spears directly into a backspear.
+                    // Must also not be holding an incompatible item.
+                    return self.grasps.Contains(null) && !self.grasps.Any(g => self.Grabability(g?.grabbed) > Player.ObjectGrabability.OneHand);
+                }
+
                 return false;
-
-            if (orig(self, obj))
-                return true;
-
-            if (!rules.Dislodge || self.bodyMode == Default || self.bodyMode == ClimbingOnBeam && self.animation != Player.AnimationIndex.HangFromBeam || self.mainBodyChunk.vel.sqrMagnitude > 5f || self.mainBodyChunk.vel.y < -0.01f)
-                return false;
-
-            for (int i = 0; i < self.input.Length; i++)
-            {
-                if (self.input[i].x != 0 || self.input[i].y != 0)
-                    return false;
             }
-
-            // Spear must be in a wall and player must be within 30 units of it
-            if (obj is Spear s && s.mode == Weapon.Mode.StuckInWall && (s.bodyChunks[0].pos - self.firstChunk.pos).magnitude < 25)
-            {
-                // If climbing on a beam but not hanging on the spear, boot
-                if (self.bodyMode == ClimbingOnBeam && self.room.GetTilePosition(self.firstChunk.pos).y != s.abstractPhysicalObject.pos.y)
-                {
-                    return false;
-                }
-                // Must have an open hand. Backspear doesn't work for dislodging spears, duh.
-                return !self.grasps.Any(v => v != null && self.Grabability(v.grabbed) > Player.ObjectGrabability.OneHand);
-            }
-
-            return false;
         }
     }
 }
