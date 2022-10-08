@@ -59,8 +59,8 @@ namespace GameruleSet
                 .Register("std/cycle_length");
 
             SleepAnywhere = new BoolRuleBuilder()
-                .Description("Lets you sleep anywhere by holding crouch on a solid, flat surface. Won't work correctly if 'save_shelter_positions' is false.")
-                .Register("std/sleep_anywhere");
+                .Description("Lets you nap anywhere by holding crouch on a solid, flat surface.")
+                .Register("std/catnap");
 
             ShareGrasps = new BoolRuleBuilder()
                 .Description("Lets players grab different parts of the same object. For example, two players can hold different parts of the same dead centipede.")
@@ -79,7 +79,7 @@ namespace GameruleSet
             new Persistence(this);
             new CycleLength(this);
             new SaveShelterPositions(this);
-            new SleepAnywhere(this);
+            new Catnap(this);
             new ShareGrasps(this);
             new HandHolding(this);
         }

@@ -10,10 +10,10 @@ using UnityEngine;
 
 namespace GameruleSet
 {
-    public class SleepAnywhere
+    public class Catnap
     {
-        const int startCurl = 120;
-        const int startSleeping = 300;
+        const int startCurl = 80;
+        const int startSleeping = 160;
         const int maxSleeping = startSleeping + 400;
 
         static readonly WeakTable<Player, SleepData> sleepData = new(_ => new());
@@ -46,7 +46,7 @@ namespace GameruleSet
         private readonly Rules rules;
         private bool caughtMMF;
 
-        public SleepAnywhere(Rules rules)
+        public Catnap(Rules rules)
         {
             this.rules = rules;
 
@@ -100,7 +100,7 @@ namespace GameruleSet
             On.HUD.HUD.Update += HUD_Update;
             On.MainLoopProcess.RawUpdate += MainLoopProcess_RawUpdate;
 
-            new Hook(typeof(VirtualMicrophone).GetMethod("get_InWorldSoundsVolumeGoal"), (Func<Func<VirtualMicrophone, float>, VirtualMicrophone, float>)GetterInWorldSoundsVolumeGoal)
+            new Hook(typeof(VirtualMicrophone).GetMethod("get_InWorldSoundsVolumeGoal"), GetterInWorldSoundsVolumeGoal)
                 .Apply();
         }
 
@@ -250,19 +250,6 @@ namespace GameruleSet
                 if (data.sleepingFor > 0 || UnityEngine.Random.value < 0.15f)
                 {
                     self.Blink(12);
-                }
-            }
-
-            var world = self.abstractCreature.world;
-            int global = GetGlobalSleepingFor(world.game);
-            if (global >= maxSleeping && world.game.Players[0] == self.abstractCreature && !self.Malnourished &&
-                world.rainCycle.TimeUntilRain < -1200 && world.game.globalRain.Intensity >= 1 && self.abstractCreature.Room?.shelter == false)
-            {
-                var roomRain = self.room?.roomRain;
-                if (roomRain == null || roomRain.dangerType == RoomRain.DangerType.None || roomRain.dangerType == RoomRain.DangerType.Rain)
-                {
-                    // If sleeping outside a shelter while nourished and safe, sleep.
-                    world.game.Win(self.playerState.foodInStomach < self.slugcatStats.foodToHibernate);
                 }
             }
         }
