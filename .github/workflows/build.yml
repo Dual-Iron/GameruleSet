@@ -1,0 +1,21 @@
+name: Build project
+
+on: [push]
+
+jobs:
+  build:
+    name: Build .NET assemblies
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out repo
+      uses: actions/checkout@v2
+    - name: Set up .NET
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '6.0.x'
+    - name: Compile projects
+      run: dotnet publish -c Release -o "output"
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        path: output/GameruleSet.dll

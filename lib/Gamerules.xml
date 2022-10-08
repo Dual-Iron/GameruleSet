@@ -1,0 +1,390 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Gamerules</name>
+    </assembly>
+    <members>
+        <member name="T:Gamerules.Result">
+            <summary>
+            Defines a potential error.
+            </summary>
+        </member>
+        <member name="P:Gamerules.Result.Err">
+            <summary>
+            The error message, or null if there was no error.
+            </summary>
+        </member>
+        <member name="P:Gamerules.Result.IsOk">
+            <summary>
+            True if there was an error.
+            </summary>
+        </member>
+        <member name="M:Gamerules.Result.FromOk">
+            <summary>
+            Gets a result that indicates no errors occurred.
+            </summary>
+        </member>
+        <member name="M:Gamerules.Result.FromOk``1(``0)">
+            <summary>
+            Gets a result that indicates no errors occurred.
+            </summary>
+        </member>
+        <member name="M:Gamerules.Result.FromErr(System.String)">
+            <summary>
+            Gets a result that indicates an error occurred.
+            </summary>
+            <param name="err">The error message.</param>
+        </member>
+        <member name="T:Gamerules.Result`1">
+            <summary>
+            Defines a potential error.
+            </summary>
+        </member>
+        <member name="P:Gamerules.Result`1.Err">
+            <summary>
+            The error message, or null if there was no error.
+            </summary>
+        </member>
+        <member name="P:Gamerules.Result`1.Ok">
+            <summary>
+            The ok value.
+            </summary>
+        </member>
+        <member name="P:Gamerules.Result`1.IsOk">
+            <summary>
+            True if there was an error.
+            </summary>
+        </member>
+        <member name="M:Gamerules.Result`1.FromOk(`0)">
+            <summary>
+            Gets a result that indicates no errors occurred.
+            </summary>
+            <param name="ok">The ok value.</param>
+        </member>
+        <member name="M:Gamerules.Result`1.FromErr(System.String)">
+            <summary>
+            Gets a result that indicates an error occurred.
+            </summary>
+            <param name="err">The error message.</param>
+        </member>
+        <member name="T:Gamerules.RuleAPI">
+            <summary>
+            Provides methods for registering, enumerating, and fetching gamerules.
+            </summary>
+        </member>
+        <member name="M:Gamerules.RuleAPI.Register(System.String,Gamerules.Rules.IRule)">
+            <summary>
+            Registers a gamerule. Once a rule is registered, it can't be registered again. Make sure to wrap this in a try-catch.
+            </summary>
+            <param name="rule">The gamerule instance, or null to remove the gamerule.</param>
+            <param name="id">Can only contain a-z, 0-9, forward slash, and underscore.</param>
+            <exception cref="T:System.ArgumentNullException"/>
+            <exception cref="T:System.ArgumentException"/>
+        </member>
+        <member name="P:Gamerules.RuleAPI.Rules">
+            <summary>
+            An enumerable of every registered ID.
+            </summary>
+        </member>
+        <member name="M:Gamerules.RuleAPI.TryGetRule(System.String,Gamerules.Rules.IRule@)">
+            <summary>
+            Tries to get a rule with the given name.
+            </summary>
+            <returns>True if a matching rule exists; false otherwise.</returns>
+            <exception cref="T:System.ArgumentException">Throws when <paramref name="id"/> is null or empty.</exception>
+        </member>
+        <member name="T:Gamerules.Rules.BoolRule">
+            <summary>
+            Defines a rule with a boolean value.
+            </summary>
+        </member>
+        <member name="M:Gamerules.Rules.BoolRule.#ctor(System.Boolean)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Gamerules.Rules.BoolRule.Deserialize(System.Object)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Gamerules.Rules.BoolRule.Serialize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Gamerules.Rules.Builders.RuleBuilder`3">
+            <summary>
+            Base class for rule builders.
+            </summary>
+            <typeparam name="T">Value type of the rule.</typeparam>
+            <typeparam name="TRule">The type of rule this builder constructs.</typeparam>
+            <typeparam name="TBuilder">The implementing class's type.</typeparam>
+        </member>
+        <member name="F:Gamerules.Rules.Builders.RuleBuilder`3.defaultValue">
+            <summary>
+            Rule's default value.
+            </summary>
+        </member>
+        <member name="F:Gamerules.Rules.Builders.RuleBuilder`3.description">
+            <summary>
+            Rule's description.
+            </summary>
+        </member>
+        <member name="F:Gamerules.Rules.Builders.RuleBuilder`3.onUpdate">
+            <summary>
+            Callback for changing value.
+            </summary>
+        </member>
+        <member name="M:Gamerules.Rules.Builders.RuleBuilder`3.#ctor">
+            <inheritdoc/>
+        </member>
+        <member name="M:Gamerules.Rules.Builders.RuleBuilder`3.Description(System.String)">
+            <summary>
+            Sets the rule's description.
+            </summary>
+            <returns><see langword="this"/></returns>
+        </member>
+        <member name="M:Gamerules.Rules.Builders.RuleBuilder`3.Default(`2)">
+            <summary>
+            Sets the rule's default value.
+            </summary>
+            <returns><see langword="this"/></returns>
+        </member>
+        <member name="M:Gamerules.Rules.Builders.RuleBuilder`3.OnUpdate(Gamerules.Rules.UpdateValueDelegate{`2})">
+            <summary>
+            Sets the rule's callback for when its value is updated.
+            </summary>
+            <returns><see langword="this"/></returns>
+        </member>
+        <member name="M:Gamerules.Rules.Builders.RuleBuilder`3.Register(System.String)">
+            <summary>
+            Registers the rule and disposes of this builder instance.
+            </summary>
+            <param name="id">The ID to register this rule under. Can only contain a-z, 0-9, forward slash, and underscore.</param>
+        </member>
+        <member name="M:Gamerules.Rules.Builders.RuleBuilder`3.GetRule(System.String)">
+            <summary>
+            Should construct and return a gamerule instance.
+            </summary>
+        </member>
+        <member name="T:Gamerules.Rules.Builders.BoolRuleBuilder">
+            <summary>
+            Builds rules with boolean values.
+            </summary>
+        </member>
+        <member name="M:Gamerules.Rules.Builders.BoolRuleBuilder.GetRule(System.String)">
+            <inheritdoc/>
+        </member>
+        <member name="T:Gamerules.Rules.Builders.EnumRuleBuilder`1">
+            <summary>
+            Builds rules with enum values.
+            </summary>
+        </member>
+        <member name="M:Gamerules.Rules.Builders.EnumRuleBuilder`1.GetRule(System.String)">
+            <inheritdoc/>
+        </member>
+        <member name="T:Gamerules.Rules.Builders.IntRuleBuilder">
+            <summary>
+            Builds rules with integer values.
+            </summary>
+        </member>
+        <member name="M:Gamerules.Rules.Builders.IntRuleBuilder.Max(System.Int32)">
+            <summary>
+            Sets the rule's maximum value.
+            </summary>
+            <returns><see langword="this"/></returns>
+        </member>
+        <member name="M:Gamerules.Rules.Builders.IntRuleBuilder.Min(System.Int32)">
+            <summary>
+            Sets the rule's minimum value.
+            </summary>
+            <returns><see langword="this"/></returns>
+        </member>
+        <member name="M:Gamerules.Rules.Builders.IntRuleBuilder.GetRule(System.String)">
+            <inheritdoc/>
+        </member>
+        <member name="T:Gamerules.Rules.Builders.FloatRuleBuilder">
+            <summary>
+            Builds rules with decimal values.
+            </summary>
+        </member>
+        <member name="M:Gamerules.Rules.Builders.FloatRuleBuilder.Max(System.Int32)">
+            <summary>
+            Sets the rule's maximum value.
+            </summary>
+            <returns><see langword="this"/></returns>
+        </member>
+        <member name="M:Gamerules.Rules.Builders.FloatRuleBuilder.Min(System.Int32)">
+            <summary>
+            Sets the rule's minimum value.
+            </summary>
+            <returns><see langword="this"/></returns>
+        </member>
+        <member name="M:Gamerules.Rules.Builders.FloatRuleBuilder.GetRule(System.String)">
+            <inheritdoc/>
+        </member>
+        <member name="T:Gamerules.Rules.EnumRule`1">
+            <summary>
+            Defines a rule with an integer value.
+            </summary>
+        </member>
+        <member name="M:Gamerules.Rules.EnumRule`1.#ctor(`0)">
+            <summary>
+            Instantiates a new rule instance.
+            </summary>
+        </member>
+        <member name="M:Gamerules.Rules.EnumRule`1.Deserialize(System.Object)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Gamerules.Rules.EnumRule`1.Serialize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Gamerules.Rules.FloatRule">
+            <summary>
+            Defines a rule with a decimal value.
+            </summary>
+        </member>
+        <member name="M:Gamerules.Rules.FloatRule.#ctor(System.Single,System.Single,System.Single)">
+            <summary>
+            Instantiates a new rule instance with a minimum and maximum value.
+            </summary>
+        </member>
+        <member name="M:Gamerules.Rules.FloatRule.#ctor(System.Single)">
+            <summary>
+            Instantiates a new rule instance.
+            </summary>
+        </member>
+        <member name="P:Gamerules.Rules.FloatRule.Min">
+            <summary>
+            The minimum value.
+            </summary>
+        </member>
+        <member name="P:Gamerules.Rules.FloatRule.Max">
+            <summary>
+            The maximum value.
+            </summary>
+        </member>
+        <member name="M:Gamerules.Rules.FloatRule.Deserialize(System.Object)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Gamerules.Rules.FloatRule.Serialize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Gamerules.Rules.IntRule">
+            <summary>
+            Defines a rule with an integer value.
+            </summary>
+        </member>
+        <member name="M:Gamerules.Rules.IntRule.#ctor(System.Int32,System.Int32,System.Int32)">
+            <summary>
+            Instantiates a new rule instance with a minimum and maximum value.
+            </summary>
+        </member>
+        <member name="M:Gamerules.Rules.IntRule.#ctor(System.Int32)">
+            <summary>
+            Instantiates a new rule instance.
+            </summary>
+        </member>
+        <member name="P:Gamerules.Rules.IntRule.Min">
+            <summary>
+            The minimum value.
+            </summary>
+        </member>
+        <member name="P:Gamerules.Rules.IntRule.Max">
+            <summary>
+            The maximum value.
+            </summary>
+        </member>
+        <member name="M:Gamerules.Rules.IntRule.Deserialize(System.Object)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Gamerules.Rules.IntRule.Serialize">
+            <inheritdoc/>
+        </member>
+        <member name="T:Gamerules.Rules.IRule">
+            <summary>
+            Defines a type of gamerule.
+            </summary>
+        </member>
+        <member name="P:Gamerules.Rules.IRule.Description">
+            <summary>
+            The gamerule's description.
+            </summary>
+        </member>
+        <member name="P:Gamerules.Rules.IRule.Value">
+            <summary>
+            The gamerule's current value.
+            </summary>
+        </member>
+        <member name="P:Gamerules.Rules.IRule.DefaultValue">
+            <summary>
+            The gamerule's fallback value.
+            </summary>
+        </member>
+        <member name="M:Gamerules.Rules.IRule.Deserialize(System.Object)">
+            <summary>
+            Gets the gamerule's value from a JSON value. 
+            <para/>Objects are represented by a <see cref="T:System.Collections.Generic.Dictionary`2"/> with <see cref="T:System.String"/> keys and <see cref="T:System.Object"/> values. 
+            <para/>Arrays are represented by a <see cref="T:System.Collections.Generic.List`1"/> of <see cref="T:System.Object"/> values.
+            </summary>
+            <param name="jsonValue">The JSON value.</param>
+        </member>
+        <member name="M:Gamerules.Rules.IRule.Serialize">
+            <summary>
+            Gets a JSON value from the gamerule's value.
+            </summary>
+        </member>
+        <member name="M:Gamerules.Rules.IRule.OnRegister(System.String)">
+            <summary>
+            Called after the gamerule is registered.
+            </summary>
+            <param name="id">The ID of the registered gamerule.</param>
+        </member>
+        <member name="T:Gamerules.Rules.UpdateValueDelegate`1">
+            <summary>
+            Used for <see cref="E:Gamerules.Rules.Rule`1.OnUpdateValue"/>.
+            </summary>
+        </member>
+        <member name="T:Gamerules.Rules.Rule`1">
+            <summary>
+            An abstract, generic implementation of <see cref="T:Gamerules.Rules.IRule"/>.
+            </summary>
+            <typeparam name="T">The type parameter for <see cref="T:Gamerules.Rules.IRule"/>.</typeparam>
+        </member>
+        <member name="M:Gamerules.Rules.Rule`1.#ctor(`0)">
+            <summary>
+            Instantiates a new rule instance.
+            </summary>
+        </member>
+        <member name="P:Gamerules.Rules.Rule`1.ID">
+            <summary>
+            The rule's ID. Set to a non-null value after calling <see cref="!:Register(string)"/>.
+            </summary>
+        </member>
+        <member name="P:Gamerules.Rules.Rule`1.Description">
+            <inheritdoc/>
+        </member>
+        <member name="P:Gamerules.Rules.Rule`1.DefaultValue">
+            <inheritdoc/>
+        </member>
+        <member name="P:Gamerules.Rules.Rule`1.Value">
+            <inheritdoc/>
+        </member>
+        <member name="M:Gamerules.Rules.Rule`1.Deserialize(System.Object)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Gamerules.Rules.Rule`1.Serialize">
+            <inheritdoc/>
+        </member>
+        <member name="E:Gamerules.Rules.Rule`1.OnUpdateValue">
+            <summary>
+            Fired after the rule is registered and after it deserializes.
+            </summary>
+        </member>
+        <member name="M:Gamerules.Rules.Rule`1.ToString">
+            <summary>
+            Gets the string representation of this rule's value.
+            </summary>
+        </member>
+        <member name="M:Gamerules.Rules.Rule`1.op_Implicit(Gamerules.Rules.Rule{`0})~`0">
+            <summary>
+            Implicit cast to <typeparamref name="T"/>.
+            </summary>
+        </member>
+    </members>
+</doc>
