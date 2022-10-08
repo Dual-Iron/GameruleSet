@@ -308,7 +308,7 @@ namespace GameruleSet
                     return false;
 
                 var data = dislodgeData[player];
-                if (data.spear == null)
+                if (!data.spear.TryGetTarget(out _))
                 {
                     data.spear = new(s);
                     data.ripChance = startingRipChance + player.slugcatStats.throwingSkill / 10f;

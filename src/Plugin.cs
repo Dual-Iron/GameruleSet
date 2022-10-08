@@ -1,5 +1,10 @@
-﻿using BepInEx;
+﻿using System.Security.Permissions;
+using System.Security;
+using BepInEx;
 using System;
+
+[module: UnverifiableCode]
+[assembly: SecurityPermission(SecurityAction.RequestMinimum, SkipVerification = true)]
 
 namespace GameruleSet
 {
