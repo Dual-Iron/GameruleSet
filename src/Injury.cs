@@ -51,7 +51,7 @@ namespace GameruleSet
             On.Player.Update += Player_Update;
             On.Player.Stun += Player_Stun;
 
-            new Hook(typeof(VirtualMicrophone).GetMethod("get_InWorldSoundsVolumeGoal"), (Func<Func<VirtualMicrophone, float>, VirtualMicrophone, float>)GetterInWorldSoundsVolumeGoal)
+            new Hook(typeof(VirtualMicrophone).GetMethod("get_InWorldSoundsVolumeGoal"), GetterInWorldSoundsVolumeGoal)
                     .Apply();
         }
 
@@ -206,7 +206,6 @@ namespace GameruleSet
             }
 
             var data = injuryData[self.playerState];
-
             if (data.Injured && self.State.alive)
             {
                 InjuredUpdate(self, ref data);
@@ -224,6 +223,25 @@ namespace GameruleSet
                 self.Stun((int)(data.damageBlockedWithMask * 15));
                 data.damageBlockedWithMask = 0;
             }
+
+#if DEBUG
+            if (Input.GetKeyDown(KeyCode.Alpha8)) {
+                DropMaskDebug(self, true);
+            }
+            if (Input.GetKeyDown(KeyCode.Alpha7)) {
+                DropMaskDebug(self, false);
+            }
+            static void DropMaskDebug(Player self, bool king)
+            {
+                var mask = new VultureMask.AbstractVultureMask(self.room.world, null, default, self.room.game.GetNewID(), 0, king) {
+                    pos = self.abstractCreature.pos
+                };
+                self.room.abstractRoom.AddEntity(mask);
+                mask.RealizeInRoom();
+                mask.realizedObject.firstChunk.HardSetPosition(self.firstChunk.pos);
+                mask.realizedObject.firstChunk.vel = default;
+            }
+#endif
         }
 
         private static void InjuredUpdate(Player self, ref InjuryData data)
@@ -337,27 +355,36 @@ namespace GameruleSet
 
         private void Injure(Creature self, BodyChunk source, Vector2? directionAndMomentum, BodyChunk hitChunk, Creature.DamageType type, ref float damage, ref float stunBonus, Player player)
         {
-            float actualDamage(float damage)
+            float ActualDamage(float damage)
             {
                 return damage / self.Template.baseDamageResistance / (self.Template.damageRestistances[(int)type, 0] > 0 ? self.Template.damageRestistances[(int)type, 0] : 1);
             }
 
             var data = injuryData[player.playerState];
 
-            var wouldBeLethal = actualDamage(damage) >= self.Template.instantDeathDamageLimit;
+            bool wouldBeLethal = ActualDamage(damage) >= self.Template.instantDeathDamageLimit;
 
             if (wouldBeLethal)
             {
-                if (source?.owner is Lizard l)
+                // Damage from lizards is the same as non-player creatures with Injury enabled
+                if (source?.owner is Lizard l) {
                     damage = l.lizardParams.biteDamage * (0.8f + 0.4f * UnityEngine.Random.value);
-                else if (type == Creature.DamageType.Explosion || type == Creature.DamageType.Blunt)
+                }
+                // Damage from explosions and blunt force is halved
+                else if (type == Creature.DamageType.Explosion || type == Creature.DamageType.Blunt) {
                     damage *= 0.5f;
+                }
             }
 
+            // Headshots from items like spears, rocks, and darts have special conditions (vulture mask protection)
             if (hitChunk.index == 0 && (type == Creature.DamageType.Stab || type == Creature.DamageType.Blunt))
             {
                 if (source != null && GetGraspedMask(player) is VultureMask mask && damage < (mask.King ? 6 : 3))
                 {
+                    if (source.owner is DartMaggot) {
+                        source.vel = default;
+                    }
+
                     VulturePopEffect(player.room, source.pos, hitChunk.pos, damage, stunBonus);
 
                     if (!mask.King)
@@ -372,11 +399,13 @@ namespace GameruleSet
                     return;
                 }
             }
+            // Anything except headshots from spears/rocks is just half damage
             else
             {
                 damage *= 0.5f;
             }
 
+            // Mercy.
             if (wouldBeLethal)
             {
                 data.lastAerobicLevel = 0;
@@ -391,19 +420,16 @@ namespace GameruleSet
                 }
             }
 
+            // Only increase injury if the attack would've been lethal, or if already injured
             if (wouldBeLethal || data.Injured)
             {
-                data.injury += actualDamage(damage);
+                data.injury += ActualDamage(damage);
+                data.injury = Mathf.Min(data.injury, 1);
+            }
 
-                if (data.injury >= 1)
-                {
-                    data.injury = 1;
-
-                    if (wouldBeLethal)
-                    {
-                        damage = self.Template.instantDeathDamageLimit;
-                    }
-                }
+            // Kill player iff attack is lethal and injury ≥ 1
+            if (wouldBeLethal && data.injury >= 1) {
+                damage = self.Template.instantDeathDamageLimit;
             }
         }
 
