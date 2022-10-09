@@ -392,23 +392,26 @@ namespace GameruleSet
 
         private void FixChangeMode(On.Spear.orig_ChangeMode orig, Spear spear, Weapon.Mode newMode)
         {
-            if (newMode == Weapon.Mode.StuckInWall && spear.mode != newMode) {
-                StoreBeamState();
-            }
-            else if (spear.mode == Weapon.Mode.StuckInWall && spear.mode != newMode) {
-                UndoStuckInWall();
-            }
+            var oldMode = spear.mode;
+            var oldStuckPos = spear.stuckInWall;
 
             orig(spear, newMode);
+
+            if (newMode == Weapon.Mode.StuckInWall && oldMode != newMode) {
+                StoreBeamState();
+            }
+            else if (oldMode == Weapon.Mode.StuckInWall && oldMode != newMode) {
+                UndoStuckInWall();
+            }
 
             void StoreBeamState()
             {
                 var roomData = Dislodge.roomData[spear.room];
                 var wall = spear.stuckInWall!.Value;
 
-                if (spear.throwDir.y != 0) {
-                    for (int i = 0; i < 3; i++) {
-                        Room.Tile tile = spear.room.GetTile(wall + new Vector2(0f, 20f * (i - 1)));
+                if (IsStuckVertically(spear)) {
+                    for (int j = 0; j < 3; j++) {
+                        Room.Tile tile = spear.room.GetTile(wall + new Vector2(0f, 20f * (j - 1)));
 
                         if (!roomData.Beams.ContainsKey(new(tile.X, tile.Y))) {
                             roomData.Beams[new(tile.X, tile.Y)] = new(tile.horizontalBeam, tile.verticalBeam);
@@ -429,11 +432,11 @@ namespace GameruleSet
             void UndoStuckInWall()
             {
                 var roomData = Dislodge.roomData[spear.room];
-                var wall = spear.stuckInWall!.Value;
+                var wall = oldStuckPos!.Value;
 
                 if (IsStuckVertically(spear)) {
-                    for (int i = 0; i < 3; i++) {
-                        Room.Tile tile = spear.room.GetTile(wall + new Vector2(0f, 20f * (i - 1)));
+                    for (int j = 0; j < 3; j++) {
+                        Room.Tile tile = spear.room.GetTile(wall + new Vector2(0f, 20f * (j - 1)));
 
                         tile.verticalBeam = roomData.Beams[new(tile.X, tile.Y)].Vertical;
                     }
