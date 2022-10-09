@@ -20,14 +20,14 @@ namespace GameruleSet
 
         sealed class SleepData
         {
-            public int sleepingFor;
+            public int sleepDuration;
             public int groggy;
             public bool wasSleeping;
         }
 
-        private static int GetGlobalSleepingFor(RainWorldGame game)
+        private static int GetMinSleepDuration(RainWorldGame game)
         {
-            int sleepingAmount = int.MaxValue;
+            int duration = 0;
 
             foreach (var abstractPlayer in game.Players)
             {
@@ -35,12 +35,12 @@ namespace GameruleSet
                 if (abstractPlayer?.realizedCreature is Player player && player.Consious)
                 {
                     var data = sleepData[player];
-                    if (sleepingAmount > data.sleepingFor)
-                        sleepingAmount = data.sleepingFor;
+                    if (duration > data.sleepDuration)
+                        duration = data.sleepDuration;
                 }
             }
 
-            return sleepingAmount != int.MaxValue ? sleepingAmount : 0;
+            return duration;
         }
 
         private readonly Rules rules;
@@ -108,7 +108,7 @@ namespace GameruleSet
         {
             if (rules.SleepAnywhere)
             {
-                int sleepingAmount = GetGlobalSleepingFor(self.room.game);
+                int sleepingAmount = GetMinSleepDuration(self.room.game);
                 if (sleepingAmount != int.MaxValue)
                 {
                     return orig(self) * Mathf.Lerp(1, 0.25f, sleepingAmount / (float)maxSleeping);
@@ -119,7 +119,7 @@ namespace GameruleSet
 
         private void Player_Stun(On.Player.orig_Stun orig, Player self, int st)
         {
-            if (sleepData[self].sleepingFor >= startSleeping)
+            if (sleepData[self].sleepDuration >= startSleeping)
             {
                 st += 60;
             }
@@ -137,7 +137,7 @@ namespace GameruleSet
                     return;
                 }
 
-                int sleepingAmount = GetGlobalSleepingFor(game);
+                int sleepingAmount = GetMinSleepDuration(game);
                 if (sleepingAmount > startSleeping)
                 {
                     if (dt > 1 / 40f)
@@ -164,7 +164,7 @@ namespace GameruleSet
         {
             orig(self);
 
-            if (rules.SleepAnywhere && self.owner is Player player && sleepData[player].sleepingFor >= startSleeping)
+            if (rules.SleepAnywhere && self.owner is Player player && sleepData[player].sleepDuration >= startSleeping)
             {
                 self.showKarmaFoodRain = true;
             }
@@ -174,7 +174,7 @@ namespace GameruleSet
         {
             orig(self);
 
-            if (rules.SleepAnywhere && sleepData[self].sleepingFor >= startCurl)
+            if (rules.SleepAnywhere && sleepData[self].sleepDuration >= startCurl)
             {
                 self.input[0] = new Player.InputPackage(self.room.game.rainWorld.options.controls[self.playerState.playerNumber].gamePad, 0, self.input[0].y, false, false, false, false, false);
                 if (self.input[0].y > 0)
@@ -199,14 +199,14 @@ namespace GameruleSet
 
             if (canSleep && self.bodyMode == Player.BodyModeIndex.Crawl && self.animation == Player.AnimationIndex.None && self.input[0].x == 0 && self.input[0].y < 0)
             {
-                if (data.sleepingFor < maxSleeping)
-                    data.sleepingFor++;
+                if (data.sleepDuration < maxSleeping)
+                    data.sleepDuration++;
             }
             else
             {
-                data.sleepingFor -= canSleep ? 2 : 10;
-                if (data.sleepingFor < 0)
-                    data.sleepingFor = 0;
+                data.sleepDuration -= canSleep ? 2 : 10;
+                if (data.sleepDuration < 0)
+                    data.sleepDuration = 0;
             }
 
             if (!canSleep)
@@ -220,15 +220,15 @@ namespace GameruleSet
                 return;
             }
 
-            if (data.sleepingFor > startCurl)
+            if (data.sleepDuration > startCurl)
             {
-                self.forceSleepCounter = data.sleepingFor - startCurl;
+                self.forceSleepCounter = data.sleepDuration - startCurl;
                 data.wasSleeping = true;
             }
 
             const int maxGroggy = 600;
 
-            if (data.sleepingFor >= startSleeping)
+            if (data.sleepDuration >= startSleeping)
             {
                 self.aerobicLevel *= 0.5f;
                 if (data.groggy < maxGroggy)
@@ -240,14 +240,14 @@ namespace GameruleSet
                     data.groggy--;
             }
 
-            if (data.sleepingFor >= startCurl)
+            if (data.sleepDuration >= startCurl)
             {
                 self.Blink(5);
             }
             else if (data.groggy > 0)
             {
                 self.slowMovementStun = (int)(10 * Mathf.InverseLerp(0, maxGroggy, data.groggy));
-                if (data.sleepingFor > 0 || UnityEngine.Random.value < 0.15f)
+                if (data.sleepDuration > 0 || UnityEngine.Random.value < 0.15f)
                 {
                     self.Blink(12);
                 }

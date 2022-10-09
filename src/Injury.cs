@@ -72,45 +72,39 @@ namespace GameruleSet
 
         private void PlayerGraphics_Update(On.PlayerGraphics.orig_Update orig, PlayerGraphics self)
         {
-            if (!rules.Injury)
-            {
-                orig(self);
+            orig(self);
+
+            if (!rules.Injury) {
+                return;
             }
-            else
-            {
-                orig(self);
 
-                var data = injuryData[self.player.playerState];
-                if (data.Injured)
-                {
-                    if (self.malnourished < data.injury * 0.75f + 0.25f)
-                        self.malnourished += 0.01f;
+            var data = injuryData[self.player.playerState];
+            if (!data.Injured) {
+                return;
+            }
 
-                    if (self.player.State.alive)
-                    {
-                        if (data.InPain)
-                        {
-                            if (self.markAlpha > 0)
-                            {
-                                self.markAlpha += (UnityEngine.Random.value - 0.5f) * data.painTime / maxPainTime;
-                                self.markAlpha = Mathf.Clamp01(self.markAlpha);
-                            }
+            if (self.malnourished < data.injury * 0.75f + 0.25f) {
+                self.malnourished += 0.01f;
+            }
 
-                            self.objectLooker.lookAtPoint = null;
-                            self.objectLooker.LookAtNothing();
-                        }
+            if (self.player.State.alive) {
+                if (data.InPain) {
+                    if (self.markAlpha > 0) {
+                        self.markAlpha += (UnityEngine.Random.value - 0.5f) * data.painTime / maxPainTime;
+                        self.markAlpha = Mathf.Clamp01(self.markAlpha);
+                    }
 
-                        if (!self.player.lungsExhausted && !self.player.exhausted)
-                        {
-                            self.breath += 1 / (70f - UnityEngine.Random.value * data.injury * 25f);
-                            self.player.swimCycle += 0.05f * self.player.aerobicLevel;
+                    self.objectLooker.lookAtPoint = null;
+                    self.objectLooker.LookAtNothing();
+                }
 
-                            if (self.player.stun <= 0)
-                            {
-                                self.head.vel.y += Mathf.Sin(self.player.swimCycle * Mathf.PI * 2) * 0.25f;
-                                self.drawPositions[0, 0].y += Mathf.Sin(self.player.swimCycle * Mathf.PI * 2f) * 0.75f;
-                            }
-                        }
+                if (!self.player.lungsExhausted && !self.player.exhausted) {
+                    self.breath += 1 / (70f - UnityEngine.Random.value * data.injury * 25f);
+                    self.player.swimCycle += 0.05f * self.player.aerobicLevel;
+
+                    if (self.player.stun <= 0) {
+                        self.head.vel.y += Mathf.Sin(self.player.swimCycle * Mathf.PI * 2) * 0.25f;
+                        self.drawPositions[0, 0].y += Mathf.Sin(self.player.swimCycle * Mathf.PI * 2f) * 0.75f;
                     }
                 }
             }
