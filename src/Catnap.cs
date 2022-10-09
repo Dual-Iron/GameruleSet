@@ -12,8 +12,8 @@ namespace GameruleSet
 {
     public class Catnap
     {
-        const int startCurl = 80;
-        const int startSleeping = 160;
+        const int startCurl = 60;
+        const int startSleeping = 120;
         const int maxSleeping = startSleeping + 400;
 
         static readonly WeakTable<Player, SleepData> sleepData = new(_ => new());
@@ -27,7 +27,7 @@ namespace GameruleSet
 
         private static int GetMinSleepDuration(RainWorldGame game)
         {
-            int duration = 0;
+            int duration = int.MaxValue;
 
             foreach (var abstractPlayer in game.Players)
             {
@@ -39,6 +39,8 @@ namespace GameruleSet
                         duration = data.sleepDuration;
                 }
             }
+
+            if (duration == int.MaxValue) return 0;
 
             return duration;
         }
