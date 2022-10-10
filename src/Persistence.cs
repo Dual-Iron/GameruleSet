@@ -42,11 +42,11 @@ namespace GameruleSet
 
         private void Room_ReadyForAI(On.Room.orig_ReadyForAI orig, Room self)
         {
-            int startIndex = self.abstractRoom.entities.Count;
+            int startIndex = self.abstractRoom?.entities?.Count ?? 0;
 
             orig(self);
 
-            if (self.abstractRoom.world.game.IsStorySession)
+            if (self.abstractRoom?.world?.game?.session is StoryGameSession && self.abstractRoom.entities != null)
             {
                 var data = gameData[self.abstractRoom.world.game];
                 for (int i = startIndex; i < self.abstractRoom.entities.Count; i++)

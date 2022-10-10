@@ -170,12 +170,18 @@ namespace GameruleSet
             if (rules.Injury && obj is Player player && chunkGrabbed == 0 && GetGraspedMask(player) is VultureMask mask) {
                 mask.room.PlaySound(SoundID.Spear_Fragment_Bounce, mask.firstChunk.pos, 0.7f, 1.35f);
                 VulturePopEffect(obj.room, null, obj.bodyChunks[chunkGrabbed].pos, 0.1f, pacifying ? 45f : 0f);
-                mask.AllGraspsLetGoOfThisObject(true);
 
-                if (self is Lizard or Vulture or DropBug or BigSpider)
+                if (self.Template.smallCreature) {
+                    self.stun += 20;
+                }
+                else if (self is Lizard or Vulture or DropBug or BigSpider) {
+                    mask.AllGraspsLetGoOfThisObject(true);
                     obj = mask;
-                else
+                }
+                else {
+                    mask.AllGraspsLetGoOfThisObject(true);
                     return false;
+                }
             }
             return orig(self, obj, graspUsed, chunkGrabbed, shareability, dominance, overrideEquallyDominant, pacifying);
         }
